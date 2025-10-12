@@ -28,9 +28,12 @@ jobs:
       - name: Build solution
         run: dotnet build OpcServerSolution.sln --no-restore
 
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
         with:
-          organization: "dilara-sntrk11"    # kendi organization key'in
-          projectKey: "opc-server-project"           # kendi project key'in
-          token: ${{ secrets.SONAR_TOKEN }}
+          args: >
+            -Dsonar.projectKey="opc-server-project"
+            -Dsonar.organization="dilara-sntrk11"
+            -Dsonar.host.url=https://sonarcloud.io
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
