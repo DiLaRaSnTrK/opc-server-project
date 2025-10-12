@@ -1,0 +1,36 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and analyze on SonarCloud
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # SonarCloud için gerekli
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore OpcServerSolution.sln
+
+      - name: Build solution
+        run: dotnet build OpcServerSolution.sln --no-restore
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        with:
+          organization: "dilara-sntrk11"    # kendi organization key'in
+          projectKey: "opc-server-project"           # kendi project key'in
+          token: ${{ secrets.SONAR_TOKEN }}
