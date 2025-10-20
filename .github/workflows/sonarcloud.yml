@@ -45,3 +45,5 @@ jobs:
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"DiLaRaSnTrK_opc-server-project" /o:"dilara-sntrk11" /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           dotnet build
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+      - name: Run tests
+        run: dotnet test --no-build --configuration Release --verbosity normal

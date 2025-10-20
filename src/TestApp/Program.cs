@@ -1,44 +1,19 @@
-﻿using System;
-using System.Threading.Tasks;
-using Infrastructure.Protocols; // ModbusClient
-using Core.Interfaces;         // IProtocolClient, ReadResult, DataReceivedEventArgs
+﻿using Infrastructure.Protocols;
 
-class Program
+string plcIp = "192.168.1.10"; // PLC IP
+int plcPort = 502;             // Modbus TCP port
+
+var client = new ModbusClient(plcIp, plcPort);
+
+client.DataReceived += (s, e) =>
 {
-    static async Task Main(string[] args)
-    {
-        // Test cihazı bilgileri (simülasyon)
-        string ip = "192.168.1.10";
-        int port = 502;
+    Console.WriteLine($"[Event] Tag {e.TagId}: {e.Value} ({e.Timestamp:HH:mm:ss})");
+};
 
-        // ModbusClient oluştur
-        var client = new ModbusClient(ip, port);
+await client.ConnectAsync();
+var result = await client.ReadAsync(0, 5);
 
-        // DataReceived eventini yakala
-        client.DataReceived += (sender, e) =>
-        {
-            Console.WriteLine($"[Event] Tag {e.TagId}: {e.Value} ({e.Timestamp:HH:mm:ss})");
-        };
+if (result.Success)
+    Console.WriteLine($"Okunan değerler: {string.Join(", ", result.Values)}");
 
-        // Bağlan
-        await client.ConnectAsync();
-
-        // ReadAsync ile veri oku
-        var result = await client.ReadAsync(0, 5); // adres 0, 5 değer oku
-        if (result.Success)
-        {
-            Console.WriteLine("Okunan değerler: " + string.Join(", ", result.Values));
-        }
-        else
-        {
-            Console.WriteLine("Okuma başarısız!");
-        }
-
-        // Bir süre eventleri görmek için bekle
-        Console.WriteLine("10 saniye boyunca eventleri izliyoruz...");
-        await Task.Delay(10000); // 10 saniye
-
-        // Bağlantıyı kapat
-        await client.DisconnectAsync();
-    }
-}
+await client.DisconnectAsync();
