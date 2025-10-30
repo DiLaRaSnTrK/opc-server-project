@@ -11,14 +11,14 @@ namespace TestApp
         {
             Console.WriteLine("=== Modbus TCP Test Başlatıldı ===");
 
-            // 1️⃣ Gerçek PLC IP ve port (veya lokal simülatör)
-            string plcIp = "192.168.1.10"; // PLC IP adresi
-            int plcPort = 502;             // Modbus TCP portu
+            // 1️⃣ PLC veya sanal Modbus Slave IP ve port
+            string plcIp = "127.0.0.1"; // Sanal PLC localhost
+            int plcPort = 502;          // Modbus TCP standart port
 
-            // 2️⃣ ModbusClient oluştur
+            // 2️⃣ ModbusClient oluştur ve polling interval ayarla
             var client = new ModbusClient(plcIp, plcPort)
             {
-                PollIntervalMs = 2000 // 2 saniyede bir veri oku
+                PollIntervalMs = 2000 // 2 saniyede bir polling
             };
 
             // 3️⃣ Event handler: veri geldiğinde yazdır
@@ -27,30 +27,42 @@ namespace TestApp
                 Console.WriteLine($"[Event] Tag {e.TagId}: {e.Value} ({e.Timestamp:HH:mm:ss})");
             };
 
-            // 4️⃣ Bağlan
-            await client.ConnectAsync();
-
-            // 5️⃣ İsteğe bağlı: belirli adreslerden manuel veri oku
-            int startAddress = 0;
-            int count = 5;
-            var result = await client.ReadAsync(startAddress, count);
-
-            if (result.Success)
+            try
             {
-                Console.WriteLine($"Okunan değerler: {string.Join(", ", result.Values)}");
+                // 4️⃣ Bağlan
+                await client.ConnectAsync();
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine("Veri okuma başarısız!");
+                Console.WriteLine("❌ Bağlantı kurulamadı: " + ex.Message);
+                return;
             }
 
-            // 6️⃣ 20 saniye boyunca polling ve event’leri izle
-            Console.WriteLine("20 saniye boyunca eventleri izliyoruz...");
+            // 5️⃣ Manuel register okuma örneği
+            int[] realAddresses = { 40001, 40002, 40003, 40004, 40005 };
+            foreach (var addr in realAddresses)
+            {
+                int offset = addr - 0; // Modbus offset hesaplama
+                try
+                {
+                    var result = await client.ReadAsync(offset, 1);
+                    if (result.Success)
+                        Console.WriteLine($"Adres {addr} (Offset {offset}) -> Değer: {result.Values[0]}");
+                    else
+                        Console.WriteLine($"❌ Adres {addr} okunamadı!");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Adres {addr} okunamadı: {ex.Message}");
+                }
+            }
+
+            // 6️⃣ 20 saniye boyunca polling ve eventleri izle
+            Console.WriteLine("📡 20 saniye boyunca olayları dinliyoruz...");
             await Task.Delay(20000);
 
             // 7️⃣ Bağlantıyı kapat
             await client.DisconnectAsync();
-
             Console.WriteLine("=== Test Sonlandı ===");
         }
     }
