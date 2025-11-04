@@ -1,51 +1,79 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
-using Infrastructure.Protocols; // ModbusClient
-using Core.Interfaces;         // IProtocolClient, ReadResult, DataReceivedEventArgs
+using Core.Models;
+using Core.Protocols;
 
-namespace TestApp
+namespace ModbusTestApp
 {
     internal class Program
     {
         static async Task Main(string[] args)
         {
-            Console.WriteLine("=== Modbus TCP Polling Test Başlatıldı ===");
+            Console.WriteLine("=== Modbus TCP Test Başlatılıyor ===");
 
-            // 1️⃣ PLC veya sanal Modbus Slave IP ve port
-            string plcIp = "192.168.33.10"; // RTU'nuzun IP adresi
-            int plcPort = 502;              // Modbus TCP standart port
-
-            // 2️⃣ ModbusClient oluştur ve Unit ID ayarla
-            var client = new ModbusClient(plcIp, plcPort)
+            // 1️⃣ Test için örnek cihaz oluştur
+            var device = new Device
             {
-                PollIntervalMs = 2000, // 2 saniyede bir polling
-                UnitId = 33        // RTU'nuzun Slave ID'si (Scadepack için varsayılan 1)
+                Id = 1,
+                Name = "Test PLC",
+                IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
+                Port = 502,
+                SlaveId = 33
             };
 
-            // 3️⃣ Event handler
+            // 2️⃣ Örnek tag oluştur (örneğin 40001 adresi)
+            var tag = new Tag
+            {
+                Id = 1,
+                DeviceId = device.Id,
+                Name = "TankSeviye",
+                Address = 3302, // çoğu Modbus sistemi 0 tabanlı adres ister (40001 -> 0)
+                RegisterType = "HoldingRegister",
+                DataType = TagDataType.Int16
+            };
+
+            // 3️⃣ Wrapper'ı oluştur
+            using var client = new ModbusClientWrapper(device);
+
+            // 4️⃣ Event yakalama (okunan veriler buradan da alınabilir)
             client.DataReceived += (s, e) =>
             {
-                Console.WriteLine($"[Event] Tag {e.TagId}: {e.Value} ({e.Timestamp:HH:mm:ss})");
+                Console.WriteLine($"📡 Veri alındı -> TagId: {e.TagId}, Value: {e.Value}, Zaman: {e.Timestamp}");
             };
 
             try
             {
-                // 4️⃣ Bağlantıyı kur ve polling’i başlat
+                // 5️⃣ Bağlantıyı kur
+                Console.WriteLine("🔌 Bağlantı kuruluyor...");
                 await client.ConnectAsync();
+
+                // 6️⃣ Tag oku
+                Console.WriteLine($"📥 {tag.Name} tag'i okunuyor...");
+                var result = await client.ReadTagAsync(tag, CancellationToken.None);
+
+                if (result.Success)
+                {
+                    Console.WriteLine($"✅ Okuma başarılı! Değer: {result.Values[0]}");
+                }
+                else
+                {
+                    Console.WriteLine($"❌ Okuma başarısız: {result.ErrorMessage}");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ Bağlantı kurulamadı: " + ex.Message);
-                return;
+                Console.WriteLine($"🚨 Hata: {ex.Message}");
+            }
+            finally
+            {
+                // 7️⃣ Bağlantıyı kapat
+                Console.WriteLine("🔒 Bağlantı kapatılıyor...");
+                await client.DisconnectAsync();
             }
 
-            // 5️⃣ 30 saniye boyunca polling’i izleyelim
-            Console.WriteLine("📡 30 saniye boyunca polling devam ediyor...");
-            await Task.Delay(30000);
-
-            // 6️⃣ Bağlantıyı kapat
-            await client.DisconnectAsync();
-            Console.WriteLine("=== Polling Test Sonlandı ===");
+            Console.WriteLine("✅ Test tamamlandı!");
+            Console.ReadLine();
         }
     }
 }

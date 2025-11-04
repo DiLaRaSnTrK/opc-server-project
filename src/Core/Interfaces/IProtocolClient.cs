@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Core.Models;
 
 namespace Core.Interfaces
 {
@@ -10,6 +9,7 @@ namespace Core.Interfaces
     {
         public bool Success { get; set; }
         public double[] Values { get; set; }
+        public string ErrorMessage { get; set; } // ✅ eklendi
     }
 
     public class DataReceivedEventArgs : EventArgs
@@ -23,7 +23,10 @@ namespace Core.Interfaces
     {
         Task ConnectAsync(CancellationToken ct = default);
         Task DisconnectAsync();
-        Task<ReadResult> ReadAsync(int address, int count, CancellationToken ct = default);
+        Task<ReadResult> ReadTagAsync(Core.Models.Tag tag, CancellationToken ct = default);
+
         event EventHandler<DataReceivedEventArgs> DataReceived;
     }
 }
+
+

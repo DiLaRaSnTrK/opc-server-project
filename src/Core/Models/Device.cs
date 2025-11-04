@@ -8,11 +8,21 @@ namespace Core.Models
 {
     public class Device
     {
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public int Id { get; set; }
         public string Name { get; set; }
-        public string Protocol { get; set; } // "Modbus", "DNP3", "S7"
-        public string Ip { get; set; }
+
+        public string Description { get; set; }
+
+        // Bağlantı bilgileri
+        public string IPAddress { get; set; }
         public int Port { get; set; }
-        public int PollIntervalMs { get; set; }
+        public byte SlaveId { get; set; }
+
+        // İlişkiler
+        public int ChannelId { get; set; }
+        public Channel Channel { get; set; }
+
+        public List<Tag> Tags { get; set; } = new();
     }
+
 }
