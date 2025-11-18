@@ -10,6 +10,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Protocols", "src\Protocols\Protocols.csproj", "{C2E5C54A-3BF3-4B86-B3A2-E100F447AC8C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UI", "src\UI\UI.csproj", "{AA13A2CB-7DD2-43A7-9215-F15988F2DB96}"
+	ProjectSection(ProjectDependencies) = postProject
+		{43EF6EEA-875C-4BDB-863C-8B63DB6486FE} = {43EF6EEA-875C-4BDB-863C-8B63DB6486FE}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject

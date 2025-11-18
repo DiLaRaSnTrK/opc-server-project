@@ -1,102 +1,103 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using Core.Interfaces;
 using Core.Models;
 using Core.Protocols;
+using Core.Database; // DatabaseService için
+using UI.Forms;
 
 namespace UI
 {
     public partial class Main : Form
     {
         private List<Channel> channelsList;
-        private ModbusClientWrapper modbusWrapper;
+        private DatabaseService db;
+
+        private ContextMenuStrip menuConnectivity;
+        private ContextMenuStrip menuChannel;
+        private ContextMenuStrip menuDevice;
+
         public Main()
         {
             InitializeComponent();
 
-            LoadSampleData();
+            db = new DatabaseService(); // system.db kullanılıyor
+            CreateContextMenus();
+
+            LoadChannelsFromDb();
             LoadTreeView();
         }
 
-        private void LoadSampleData()
+        // ---------------- Context Menüler ----------------
+        private void CreateContextMenus()
         {
-            channelsList = new List<Channel>
-            {
-                new Channel
-                {
-                    Name = "Channel 1",
-                    Protocol= ProtocolType.ModbusRTU,
-                    Description = "Su pompası sistemi",
-                    Devices = new List<Device>
-                    {
-                        new Device
-                        {
-                            Name = "Pompa 1",
-                            IPAddress = "192.168.1.10",
-                            Port = 502,
-                            SlaveId = 1,
-                            Description = "Ana pompa",
-                            Tags = new List<Tag>
-                            {
-                                new Tag { Name = "Basınç", Address = 40001, DataType = TagDataType.Float, RegisterType = "HoldingRegister", Description = "Pompa basınç değeri", Value = 3.4, LastUpdated = DateTime.Now },
-                                new Tag { Name = "Sıcaklık", Address = 40002, DataType = TagDataType.Float, RegisterType = "HoldingRegister", Description = "Motor sıcaklığı", Value = 65.2, LastUpdated = DateTime.Now }
-                            }
-                        },
-                        new Device
-                        {
-                            Name = "Pompa 2",
-                            IPAddress = "192.168.1.11",
-                            Port = 502,
-                            SlaveId = 2,
-                            Description = "Yedek pompa",
-                            Tags = new List<Tag>
-                            {
-                                new Tag { Name = "Basınç", Address = 40005, DataType = TagDataType.Float, RegisterType = "HoldingRegister", Description = "Yedek pompa basıncı", Value = 3.1, LastUpdated = DateTime.Now }
-                            }
-                        }
-                    }
-                },
-                new Channel
-                {
-                    Name = "Channel 2",
-                    Protocol = ProtocolType.ModbusRTU,
-                    Description = "Havalandırma sistemi",
-                    Devices = new List<Device>()
-                }
-            };
+            menuConnectivity = new ContextMenuStrip();
+            menuConnectivity.Items.Add("Yeni Channel Ekle", null, OnAddChannelClick);
+
+            menuChannel = new ContextMenuStrip();
+            menuChannel.Items.Add("Yeni Device Ekle", null, OnAddDeviceClick);
+
+            menuDevice = new ContextMenuStrip();
+            menuDevice.Items.Add("Yeni Tag Ekle", null, OnAddTagClick);
+
+            treeView1.NodeMouseClick += TreeView1_NodeMouseClick;
         }
 
+        private void TreeView1_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            treeView1.SelectedNode = e.Node;
+
+            if (e.Button == MouseButtons.Right)
+            {
+                if (e.Node.Text == "Connectivity")
+                    menuConnectivity.Show(treeView1, e.Location);
+                else if (e.Node.Tag is Channel)
+                    menuChannel.Show(treeView1, e.Location);
+                else if (e.Node.Tag is Device)
+                    menuDevice.Show(treeView1, e.Location);
+            }
+        }
+
+        // ---------------- DB’den veri yükle ----------------
+        private void LoadChannelsFromDb()
+        {
+            channelsList = db.GetChannels();
+            foreach (var ch in channelsList)
+            {
+                ch.Devices = db.GetDevicesByChannelId(ch.ChannelId);
+                foreach (var dev in ch.Devices)
+                {
+                    dev.Tags = db.GetTagsByDeviceId(dev.DeviceId);
+                }
+            }
+        }
+
+        // ---------------- TreeView ----------------
         private void LoadTreeView()
         {
             treeView1.Nodes.Clear();
+            var root = new TreeNode("Connectivity");
 
-            var rootNode = new TreeNode("Connectivity");
-
-            foreach (var channel in channelsList)
+            foreach (var ch in channelsList)
             {
-                var channelNode = new TreeNode(channel.Name) { Tag = channel };
-
-                foreach (var device in channel.Devices)
+                var chNode = new TreeNode(ch.Name) { Tag = ch };
+                foreach (var dev in ch.Devices)
                 {
-                    var deviceNode = new TreeNode(device.Name) { Tag = device };
-
-                    foreach (var tag in device.Tags)
+                    var devNode = new TreeNode(dev.Name) { Tag = dev };
+                    foreach (var tag in dev.Tags)
                     {
-                        var tagNode = new TreeNode(tag.Name) { Tag = tag };
-                        deviceNode.Nodes.Add(tagNode);
+                        devNode.Nodes.Add(new TreeNode(tag.Name) { Tag = tag });
                     }
-
-                    channelNode.Nodes.Add(deviceNode);
+                    chNode.Nodes.Add(devNode);
                 }
-
-                rootNode.Nodes.Add(channelNode);
+                root.Nodes.Add(chNode);
             }
 
-            treeView1.Nodes.Add(rootNode);
+            treeView1.Nodes.Add(root);
             treeView1.ExpandAll();
         }
 
+        // ---------------- TreeView Selection ----------------
         private void treeView1_AfterSelect(object sender, TreeViewEventArgs e)
         {
             dataGridView1.Rows.Clear();
@@ -104,139 +105,101 @@ namespace UI
 
             if (e.Node.Text == "Connectivity")
             {
-                // --- CONNECTIVITY seçildi ---
-                dataGridView1.Columns.Add("ChannelName", "Channel Adı");
+                dataGridView1.Columns.Add("Name", "Channel Adı");
                 dataGridView1.Columns.Add("Protocol", "Protokol");
-                dataGridView1.Columns.Add("Description", "Açıklama");
+                dataGridView1.Columns.Add("Desc", "Açıklama");
 
                 foreach (var ch in channelsList)
-                {
                     dataGridView1.Rows.Add(ch.Name, ch.Protocol, ch.Description);
-                }
             }
-            else if (e.Node.Tag is Channel channel)
+            else if (e.Node.Tag is Channel ch)
             {
-                // --- CHANNEL seçildi ---
-                dataGridView1.Columns.Add("DeviceName", "Cihaz Adı");
+                dataGridView1.Columns.Add("DevName", "Cihaz Adı");
                 dataGridView1.Columns.Add("IP", "IP Adresi");
                 dataGridView1.Columns.Add("Port", "Port");
-                dataGridView1.Columns.Add("SlaveId", "Slave ID");
+                dataGridView1.Columns.Add("Slave", "Slave ID");
                 dataGridView1.Columns.Add("TagCount", "Tag Sayısı");
-                dataGridView1.Columns.Add("Description", "Açıklama");
+                dataGridView1.Columns.Add("Desc", "Açıklama");
 
-                foreach (var dev in channel.Devices)
-                {
+                foreach (var dev in ch.Devices)
                     dataGridView1.Rows.Add(dev.Name, dev.IPAddress, dev.Port, dev.SlaveId, dev.Tags.Count, dev.Description);
-                }
             }
-            else if (e.Node.Tag is Device device)
+            else if (e.Node.Tag is Device dev)
             {
-                // --- DEVICE seçildi ---
                 dataGridView1.Columns.Add("TagName", "Tag Adı");
-                dataGridView1.Columns.Add("RegisterType", "Register Türü");
+                dataGridView1.Columns.Add("RegType", "Register");
                 dataGridView1.Columns.Add("Address", "Adres");
-                dataGridView1.Columns.Add("DataType", "Veri Türü");
+                dataGridView1.Columns.Add("Type", "Veri Türü");
                 dataGridView1.Columns.Add("Value", "Değer");
-                dataGridView1.Columns.Add("LastRead", "Son Okunma");
-                dataGridView1.Columns.Add("Description", "Açıklama");
+                dataGridView1.Columns.Add("Updated", "Son Okuma");
+                dataGridView1.Columns.Add("Desc", "Açıklama");
 
-                foreach (var tag in device.Tags)
-                {
+                foreach (var tag in dev.Tags)
                     dataGridView1.Rows.Add(tag.Name, tag.RegisterType, tag.Address, tag.DataType, tag.Value, tag.LastUpdated, tag.Description);
-                }
             }
             else if (e.Node.Tag is Tag tag)
             {
-                // --- TAG seçildi ---
-                dataGridView1.Columns.Add("Property", "Özellik");
-                dataGridView1.Columns.Add("Value", "Değer");
+                dataGridView1.Columns.Add("Prop", "Özellik");
+                dataGridView1.Columns.Add("Val", "Değer");
 
-                dataGridView1.Rows.Add("Ad", tag.Name);
-                dataGridView1.Rows.Add("Register Türü", tag.RegisterType);
+                dataGridView1.Rows.Add("Tag Adı", tag.Name);
+                dataGridView1.Rows.Add("Register", tag.RegisterType);
                 dataGridView1.Rows.Add("Adres", tag.Address);
                 dataGridView1.Rows.Add("Veri Türü", tag.DataType);
                 dataGridView1.Rows.Add("Değer", tag.Value);
-                dataGridView1.Rows.Add("Son Okunma", tag.LastUpdated);
+                dataGridView1.Rows.Add("Son Okuma", tag.LastUpdated);
                 dataGridView1.Rows.Add("Açıklama", tag.Description);
             }
         }
-        private async void button1_Click(object sender, EventArgs e)
+
+        // ---------------- Sağ Tık -> Ekleme ----------------
+        private void OnAddChannelClick(object sender, EventArgs e)
         {
-            if (treeView1.SelectedNode?.Tag is Device selectedDevice)
+            var f = new AddChannelForm();
+            if (f.ShowDialog() == DialogResult.OK)
             {
-                // Cihaz seçilmiş → tüm tag'ları oku
-                dataGridView1.Rows.Clear();
-                modbusWrapper = new ModbusClientWrapper(selectedDevice);
+                var newCh = f.NewChannel;
+                newCh.ChannelId = db.AddChannel(newCh);
+                channelsList.Add(newCh);
+                LoadTreeView();
+            }
+        }
 
-                try
+        private void OnAddDeviceClick(object sender, EventArgs e)
+        {
+            if (treeView1.SelectedNode.Tag is Channel ch)
+            {
+                var f = new AddDeviceForm();
+                if (f.ShowDialog() == DialogResult.OK)
                 {
-                    await modbusWrapper.ConnectAsync();
-
-                    foreach (var tag in selectedDevice.Tags)
-                    {
-                        var result = await modbusWrapper.ReadTagAsync(tag);
-
-                        if (result.Success)
-                        {
-                            dataGridView1.Rows.Add(tag.Name, result.Values[0]);
-                        }
-                        else
-                        {
-                            dataGridView1.Rows.Add(tag.Name, "Hata: " + result.ErrorMessage);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Modbus bağlantı hatası: " + ex.Message);
-                }
-                finally
-                {
-                    await modbusWrapper.DisconnectAsync();
+                    var newDev = f.NewDevice;
+                    newDev.ChannelId = ch.ChannelId;
+                    newDev.DeviceId = db.AddDevice(newDev);
+                    ch.Devices.Add(newDev);
+                    LoadTreeView();
                 }
             }
-            else if (treeView1.SelectedNode?.Tag is Tag selectedTag)
+        }
+
+        private void OnAddTagClick(object sender, EventArgs e)
+        {
+            if (treeView1.SelectedNode.Tag is Device dev)
             {
-                // Sadece bir tag seçilmiş → sadece onu oku
-                dataGridView1.Rows.Clear();
-
-                var parentDevice = treeView1.SelectedNode.Parent?.Tag as Device;
-                if (parentDevice == null)
+                var f = new AddTagForm();
+                if (f.ShowDialog() == DialogResult.OK)
                 {
-                    MessageBox.Show("Tag'ın bağlı olduğu cihaz bulunamadı!");
-                    return;
-                }
-
-                modbusWrapper = new ModbusClientWrapper(parentDevice);
-
-                try
-                {
-                    await modbusWrapper.ConnectAsync();
-
-                    var result = await modbusWrapper.ReadTagAsync(selectedTag);
-
-                    if (result.Success)
-                    {
-                        dataGridView1.Rows.Add(selectedTag.Name, result.Values[0]);
-                    }
-                    else
-                    {
-                        dataGridView1.Rows.Add(selectedTag.Name, "Hata: " + result.ErrorMessage);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Modbus bağlantı hatası: " + ex.Message);
-                }
-                finally
-                {
-                    await modbusWrapper.DisconnectAsync();
+                    var newTag = f.NewTag;
+                    newTag.DeviceId = dev.DeviceId;
+                    newTag.TagId = db.AddTag(newTag);
+                    dev.Tags.Add(newTag);
+                    LoadTreeView();
                 }
             }
-            else
-            {
-                MessageBox.Show("Lütfen bir cihaz veya tag seçin!");
-            }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

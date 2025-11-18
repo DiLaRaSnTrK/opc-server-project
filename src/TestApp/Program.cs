@@ -15,7 +15,7 @@ namespace ModbusTestApp
             // 1️⃣ Test için örnek cihaz oluştur
             var device = new Device
             {
-                Id = 1,
+                DeviceId = 1,
                 Name = "Test PLC",
                 IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
                 Port = 502,
@@ -25,8 +25,8 @@ namespace ModbusTestApp
             // 2️⃣ Örnek tag oluştur (örneğin 40001 adresi)
             var tag = new Tag
             {
-                Id = 1,
-                DeviceId = device.Id,
+                TagId = 1,
+                DeviceId = device.DeviceId,
                 Name = "TankSeviye",
                 Address = 3302, // çoğu Modbus sistemi 0 tabanlı adres ister (40001 -> 0)
                 RegisterType = "HoldingRegister",

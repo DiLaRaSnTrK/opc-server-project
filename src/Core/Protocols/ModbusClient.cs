@@ -104,7 +104,7 @@ namespace Core.Protocols
                 var handler = DataReceived;
                 handler?.Invoke(this, new DataReceivedEventArgs
                 {
-                    TagId = tag.Id,
+                    TagId = tag.TagId,
                     Value = value,
                     Timestamp = DateTime.Now
                 });
