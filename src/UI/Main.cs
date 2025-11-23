@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
+using Core.Database; // DatabaseService
 using Core.Models;
 using Core.Protocols;
-using Core.Database; // DatabaseService için
 using UI.Forms;
 
 namespace UI
@@ -16,12 +16,12 @@ namespace UI
         private ContextMenuStrip menuConnectivity;
         private ContextMenuStrip menuChannel;
         private ContextMenuStrip menuDevice;
+        private ContextMenuStrip menuTag;
 
         public Main()
         {
             InitializeComponent();
-
-            db = new DatabaseService(); // system.db kullanılıyor
+            db = new DatabaseService();
             CreateContextMenus();
 
             LoadChannelsFromDb();
@@ -31,16 +31,79 @@ namespace UI
         // ---------------- Context Menüler ----------------
         private void CreateContextMenus()
         {
+            var addIcon = Properties.Resources.add;
+            var deleteIcon = Properties.Resources.delete;
+
+            // Connectivity menüsü (Channel ekleme/silme)
             menuConnectivity = new ContextMenuStrip();
-            menuConnectivity.Items.Add("Yeni Channel Ekle", null, OnAddChannelClick);
+            var addChannel = new ToolStripMenuItem("Yeni Channel Ekle", addIcon, OnAddChannelClick);
 
+            menuConnectivity.Items.Add(addChannel);
+           
+
+            // Channel menüsü (Device ekleme/silme)
             menuChannel = new ContextMenuStrip();
-            menuChannel.Items.Add("Yeni Device Ekle", null, OnAddDeviceClick);
+            var addDevice = new ToolStripMenuItem("Yeni Device Ekle", addIcon, OnAddDeviceClick);
+            var deleteChannel = new ToolStripMenuItem("Channel Sil", deleteIcon, OnDeleteChannelClick);
 
+            menuChannel.Items.Add(addDevice);
+            menuChannel.Items.Add(deleteChannel);
+
+            // Device menüsü (Tag ekleme/silme)
             menuDevice = new ContextMenuStrip();
-            menuDevice.Items.Add("Yeni Tag Ekle", null, OnAddTagClick);
+            var addTag = new ToolStripMenuItem("Yeni Tag Ekle", addIcon, OnAddTagClick);
+            var deleteDevice = new ToolStripMenuItem("Device Sil", deleteIcon, OnDeleteDeviceClick); // Device silme
+            menuDevice.Items.Add(addTag);
+            menuDevice.Items.Add(deleteDevice);
+
+            // Tag menüsü (sadece silme)
+            menuTag = new ContextMenuStrip();
+            var deleteOnlyTag = new ToolStripMenuItem("Tag Sil", deleteIcon, OnDeleteTagClick);
+            menuTag.Items.Add(deleteOnlyTag);
 
             treeView1.NodeMouseClick += TreeView1_NodeMouseClick;
+        }
+
+        // ---------------- Sağ Tık -> Silme ----------------
+        private void OnDeleteChannelClick(object sender, EventArgs e)
+        {
+            if (treeView1.SelectedNode?.Tag is Channel ch)
+            {
+                if (MessageBox.Show($"'{ch.Name}' kanalını silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                {
+                    db.DeleteChannel(ch.ChannelId);
+                    channelsList.Remove(ch);
+                    LoadTreeView();
+                }
+            }
+        }
+
+        private void OnDeleteDeviceClick(object sender, EventArgs e)
+        {
+            if (treeView1.SelectedNode?.Tag is Device dev)
+            {
+                if (MessageBox.Show($"'{dev.Name}' cihazını silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                {
+                    db.DeleteDevice(dev.DeviceId);
+                    var parentChannel = treeView1.SelectedNode.Parent?.Tag as Channel;
+                    parentChannel?.Devices.Remove(dev);
+                    LoadTreeView();
+                }
+            }
+        }
+
+        private void OnDeleteTagClick(object sender, EventArgs e)
+        {
+            if (treeView1.SelectedNode?.Tag is Tag tag)
+            {
+                if (MessageBox.Show($"'{tag.Name}' tagini silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                {
+                    db.DeleteTag(tag.TagId);
+                    var parentDevice = treeView1.SelectedNode.Parent?.Tag as Device;
+                    parentDevice?.Tags.Remove(tag);
+                    LoadTreeView();
+                }
+            }
         }
 
         private void TreeView1_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
@@ -55,6 +118,8 @@ namespace UI
                     menuChannel.Show(treeView1, e.Location);
                 else if (e.Node.Tag is Device)
                     menuDevice.Show(treeView1, e.Location);
+                else if (e.Node.Tag is Tag)
+                    menuTag.Show(treeView1, e.Location);
             }
         }
 
@@ -85,9 +150,7 @@ namespace UI
                 {
                     var devNode = new TreeNode(dev.Name) { Tag = dev };
                     foreach (var tag in dev.Tags)
-                    {
                         devNode.Nodes.Add(new TreeNode(tag.Name) { Tag = tag });
-                    }
                     chNode.Nodes.Add(devNode);
                 }
                 root.Nodes.Add(chNode);
@@ -197,9 +260,105 @@ namespace UI
             }
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        // ---------------- Modbus Okuma (button1_Click) ----------------
+        private async void button1_Click(object sender, EventArgs e)
         {
+            if (treeView1.SelectedNode == null)
+            {
+                MessageBox.Show("Lütfen bir cihaz veya tag seçin!");
+                return;
+            }
 
+            // ===================== DEVICE OKUMA =====================
+            if (treeView1.SelectedNode.Tag is Device selectedDevice)
+            {
+                var modbus = new ModbusClientWrapper(selectedDevice);
+
+                try
+                {
+                    await modbus.ConnectAsync();
+
+                    foreach (var tag in selectedDevice.Tags)
+                    {
+                        var result = await modbus.ReadTagAsync(tag);
+
+                        if (result.Success)
+                        {
+                            var val = result.Values[0];
+                            tag.Value = val;
+                            tag.LastUpdated = DateTime.Now;
+
+                            db.UpdateTagValue(tag, val);
+
+                            // DGV güncelle
+                            foreach (DataGridViewRow row in dataGridView1.Rows)
+                            {
+                                if (row.Cells[0].Value?.ToString() == tag.Name) // TagName
+                                {
+                                    row.Cells["Value"].Value = val;
+                                    row.Cells["Updated"].Value = tag.LastUpdated;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Modbus bağlantı hatası: " + ex.Message);
+                }
+                finally
+                {
+                    await modbus.DisconnectAsync();
+                }
+
+                return;
+            }
+
+            // ===================== TAG OKUMA =====================
+            if (treeView1.SelectedNode.Tag is Tag selectedTag)
+            {
+                var parentDevice = treeView1.SelectedNode.Parent?.Tag as Device;
+
+                var modbus = new ModbusClientWrapper(parentDevice);
+
+                try
+                {
+                    await modbus.ConnectAsync();
+                    var result = await modbus.ReadTagAsync(selectedTag);
+
+                    if (result.Success)
+                    {
+                        var val = result.Values[0];
+                        selectedTag.Value = val;
+                        selectedTag.LastUpdated = DateTime.Now;
+
+                        db.UpdateTagValue(selectedTag, val);
+
+                        // DGV güncelle
+                        foreach (DataGridViewRow row in dataGridView1.Rows)
+                        {
+                            if (row.Cells[0].Value?.ToString() == "Değer")
+                                row.Cells[1].Value = val;
+
+                            if (row.Cells[0].Value?.ToString() == "Son Okuma")
+                                row.Cells[1].Value = selectedTag.LastUpdated;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Modbus bağlantı hatası: " + ex.Message);
+                }
+                finally
+                {
+                    await modbus.DisconnectAsync();
+                }
+                return;
+            }
+
+            MessageBox.Show("Lütfen bir cihaz veya tag seçin!");
         }
+
     }
 }

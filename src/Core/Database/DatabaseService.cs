@@ -182,17 +182,55 @@ namespace Core.Database
             return list;
         }
 
-        public void UpdateTagValue(int tagId, double value)
+        public void UpdateTagValue(Tag tag, double rawValue)
         {
             using var con = new SqliteConnection($"Data Source={_dbPath}");
             con.Open();
+
+            object dbValue = rawValue;
+
+            switch (tag.DataType)
+            {
+                case TagDataType.Bool:
+                    dbValue = rawValue == 1 ? 1 : 0;
+                    break;
+
+                case TagDataType.Int16:
+                    dbValue = (short)rawValue;
+                    break;
+
+                case TagDataType.UInt16:
+                    dbValue = (ushort)rawValue;
+                    break;
+
+                case TagDataType.Int32:
+                    dbValue = (int)rawValue;
+                    break;
+
+                case TagDataType.UInt32:
+                    dbValue = (uint)rawValue;
+                    break;
+
+                case TagDataType.Float:
+                    dbValue = (float)rawValue;
+                    break;
+
+                case TagDataType.Double:
+                    dbValue = rawValue;
+                    break;
+            }
+
             using var cmd = con.CreateCommand();
-            cmd.CommandText = "UPDATE Tags SET LastValue = @v, LastUpdated = @lu WHERE TagId = @id";
-            cmd.Parameters.AddWithValue("@v", value);
+            cmd.CommandText =
+                "UPDATE Tags SET LastValue = @v, LastUpdated = @lu WHERE TagId = @id";
+
+            cmd.Parameters.AddWithValue("@v", dbValue);
             cmd.Parameters.AddWithValue("@lu", DateTime.Now.ToString("o"));
-            cmd.Parameters.AddWithValue("@id", tagId);
+            cmd.Parameters.AddWithValue("@id", tag.TagId);
+
             cmd.ExecuteNonQuery();
         }
+
         #endregion
 
         public void Dispose()
@@ -228,5 +266,37 @@ namespace Core.Database
             }
         }
 
+        public void DeleteChannel(int channelId)
+        {
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "DELETE FROM Channels WHERE ChannelId=@id";
+            cmd.Parameters.AddWithValue("@id", channelId);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void DeleteDevice(int deviceId)
+        {
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "DELETE FROM Devices WHERE DeviceId=@id";
+            cmd.Parameters.AddWithValue("@id", deviceId);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void DeleteTag(int tagId)
+        {
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "DELETE FROM Tags WHERE TagId=@id";
+            cmd.Parameters.AddWithValue("@id", tagId);
+            cmd.ExecuteNonQuery();
+        }
+
+
     }
+
 }

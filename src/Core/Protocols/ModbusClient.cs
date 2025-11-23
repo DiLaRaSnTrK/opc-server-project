@@ -30,8 +30,10 @@ namespace Core.Protocols
                 try
                 {
                     if (!_client.Connected)
+                    {
                         _client.UnitIdentifier = _device.SlaveId;
                         _client.Connect();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -67,7 +69,7 @@ namespace Core.Protocols
                     await ConnectAsync(ct);
 
                 int address = tag.Address;
-                int quantity = tag.DataType == TagDataType.Float ? 2 : 1;
+                int quantity = GetRegisterCount(tag.DataType);
 
                 double value = 0;
 
@@ -77,22 +79,20 @@ namespace Core.Protocols
                     {
                         case "HoldingRegister":
                             var hr = _client.ReadHoldingRegisters(address, quantity);
-                            value = ConvertToDouble(hr, tag.DataType);
+                            value = ConvertRegisters(hr, tag.DataType);
                             break;
 
                         case "InputRegister":
                             var ir = _client.ReadInputRegisters(address, quantity);
-                            value = ConvertToDouble(ir, tag.DataType);
+                            value = ConvertRegisters(ir, tag.DataType);
                             break;
 
                         case "Coil":
-                            var coil = _client.ReadCoils(address, 1);
-                            value = coil[0] ? 1 : 0;
+                            value = _client.ReadCoils(address, 1)[0] ? 1 : 0;
                             break;
 
                         case "DiscreteInput":
-                            var di = _client.ReadDiscreteInputs(address, 1);
-                            value = di[0] ? 1 : 0;
+                            value = _client.ReadDiscreteInputs(address, 1)[0] ? 1 : 0;
                             break;
 
                         default:
@@ -100,9 +100,8 @@ namespace Core.Protocols
                     }
                 }, ct);
 
-                // Event fırlat
-                var handler = DataReceived;
-                handler?.Invoke(this, new DataReceivedEventArgs
+                // Event
+                DataReceived?.Invoke(this, new DataReceivedEventArgs
                 {
                     TagId = tag.TagId,
                     Value = value,
@@ -126,23 +125,88 @@ namespace Core.Protocols
             }
         }
 
-        private double ConvertToDouble(int[] registers, TagDataType dataType)
+        // Kaç register okunacağını belirler
+        private int GetRegisterCount(TagDataType dt)
         {
-            if (registers == null || registers.Length == 0)
+            return dt switch
+            {
+                TagDataType.Bool => 1,
+                TagDataType.Int16 => 1,
+                TagDataType.UInt16 => 1,
+                TagDataType.Float => 2,
+                TagDataType.Int32 => 2,
+                TagDataType.UInt32 => 2,
+                TagDataType.Double => 4,
+                _ => 1
+            };
+        }
+
+        // TÜM TIPLER İÇİN DOĞRU DÖNÜŞÜM
+        private double ConvertRegisters(int[] r, TagDataType type)
+        {
+            if (r == null || r.Length == 0)
                 return 0;
 
-            if (dataType == TagDataType.Float && registers.Length >= 2)
+            switch (type)
             {
-                // Little-endian düzenine göre dönüştürme
-                byte[] bytes = new byte[4];
-                bytes[0] = (byte)(registers[0] & 0xFF);
-                bytes[1] = (byte)(registers[0] >> 8);
-                bytes[2] = (byte)(registers[1] & 0xFF);
-                bytes[3] = (byte)(registers[1] >> 8);
-                return BitConverter.ToSingle(bytes, 0);
-            }
+                case TagDataType.Bool:
+                    return r[0] == 1 ? 1 : 0;
 
-            return registers[0];
+                case TagDataType.Int16:
+                    return (short)r[0];
+
+                case TagDataType.UInt16:
+                    return r[0];
+
+                case TagDataType.Int32:
+                    return CombineToInt32(r[0], r[1]);
+
+                case TagDataType.UInt32:
+                    return (uint)CombineToInt32(r[0], r[1]);
+
+                case TagDataType.Float:
+                    return CombineToFloat(r[0], r[1]);
+
+                case TagDataType.Double:
+                    return CombineToDouble(r);
+
+                default:
+                    return r[0];
+            }
+        }
+
+        // 2 Register → Float
+        private float CombineToFloat(int reg1, int reg2)
+        {
+            byte[] bytes =
+            {
+                (byte)(reg1 >> 8),
+                (byte)(reg1 & 0xFF),
+                (byte)(reg2 >> 8),
+                (byte)(reg2 & 0xFF)
+            };
+
+            return BitConverter.ToSingle(bytes, 0);
+        }
+
+        // 2 Register → INT32
+        private int CombineToInt32(int reg1, int reg2)
+        {
+            return (reg1 << 16) | (reg2 & 0xFFFF);
+        }
+
+        // 4 Register → DOUBLE
+        private double CombineToDouble(int[] r)
+        {
+            byte[] bytes =
+            {
+                (byte)(r[0] >> 8), (byte)(r[0] & 0xFF),
+                (byte)(r[1] >> 8), (byte)(r[1] & 0xFF),
+                (byte)(r[2] >> 8), (byte)(r[2] & 0xFF),
+                (byte)(r[3] >> 8), (byte)(r[3] & 0xFF)
+            };
+
+            return BitConverter.ToDouble(bytes, 0);
         }
 
         public void Dispose()
@@ -154,10 +218,7 @@ namespace Core.Protocols
                 if (_client.Connected)
                     _client.Disconnect();
             }
-            catch
-            {
-                // Sessizce geç
-            }
+            catch { }
 
             _disposed = true;
             GC.SuppressFinalize(this);

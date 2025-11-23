@@ -32,11 +32,14 @@ namespace Core.Models
         public Device Device { get; set; }
     }
 
-    public enum TagDataType
+public enum TagDataType
     {
-        Int16,
-        UInt16,
-        Float,
-        Bool
+        Bool = 0,
+        Int16 = 1,
+        UInt16 = 2,
+        Int32 = 3,
+        UInt32 = 4,
+        Float = 5,
+        Double = 6
     }
 }
