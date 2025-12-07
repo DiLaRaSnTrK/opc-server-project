@@ -50,6 +50,12 @@ namespace Core.Database
                 LastUpdated TEXT,
                 FOREIGN KEY(DeviceId) REFERENCES Devices(DeviceId) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS TagHistory (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    TagId INTEGER,
+                    Value REAL,
+                    Timestamp TEXT
+            );
             ";
             cmd.ExecuteNonQuery();
         }
@@ -232,6 +238,55 @@ namespace Core.Database
         }
 
         #endregion
+        public void InsertHistory(int tagId, double value, DateTime ts)
+        {
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+
+            using var cmd = con.CreateCommand();
+            cmd.CommandText =
+                "INSERT INTO TagHistory (TagId, Value, Timestamp) VALUES (@id, @v, @ts)";
+
+            cmd.Parameters.AddWithValue("@id", tagId);
+            cmd.Parameters.AddWithValue("@v", value);
+            cmd.Parameters.AddWithValue("@ts", ts.ToString("o"));
+
+            cmd.ExecuteNonQuery();
+        }
+
+        // Tarih aralığına göre veri getiren yeni metot
+        public List<(DateTime Timestamp, double Value)> GetTagHistory(int tagId, DateTime startDate, DateTime endDate)
+        {
+            var list = new List<(DateTime, double)>();
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+
+            // SQLite'ta tarihler string (ISO8601) tutulduğu için string karşılaştırması yapıyoruz.
+            // Başlangıç gününün sabahı (00:00) ile bitiş gününün gecesi (23:59) arasını alıyoruz.
+            cmd.CommandText = @"
+        SELECT Timestamp, Value 
+        FROM TagHistory 
+        WHERE TagId=@id 
+          AND Timestamp >= @start 
+          AND Timestamp <= @end 
+        ORDER BY Timestamp ASC"; // Grafikte soldan sağa akış için ASC önemli
+
+            cmd.Parameters.AddWithValue("@id", tagId);
+            cmd.Parameters.AddWithValue("@start", startDate.ToString("o")); // ISO format
+            cmd.Parameters.AddWithValue("@end", endDate.ToString("o"));
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (DateTime.TryParse(reader.GetString(0), out DateTime dt))
+                {
+                    list.Add((dt, reader.GetDouble(1)));
+                }
+            }
+            return list;
+        }
+
 
         public void Dispose()
         {

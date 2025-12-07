@@ -6,6 +6,9 @@
 
   <ItemGroup>
     <PackageReference Include="EasyModbusTCP" Version="5.6.0" />
+    <PackageReference Include="HIC.System.Windows.Forms.DataVisualization" Version="1.0.1" />
+    <PackageReference Include="LiveCharts.Core" Version="0.9.8" />
+    <PackageReference Include="LiveCharts.WinForms.NetCore3" Version="0.9.8" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.10" />
     <PackageReference Include="NModbus" Version="3.0.81" />
@@ -15,6 +18,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="WinForms.DataVisualization" Version="1.10.0" />
   </ItemGroup>
 
   <ItemGroup>

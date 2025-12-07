@@ -32,6 +32,7 @@ partial class Main
         DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
         DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
         panel1 = new Panel();
+        button2 = new Button();
         label1 = new Label();
         button1 = new Button();
         treeView1 = new TreeView();
@@ -43,6 +44,7 @@ partial class Main
         // panel1
         // 
         panel1.BackColor = Color.FromArgb(55, 67, 109);
+        panel1.Controls.Add(button2);
         panel1.Controls.Add(label1);
         panel1.Controls.Add(button1);
         panel1.Dock = DockStyle.Top;
@@ -50,6 +52,19 @@ partial class Main
         panel1.Name = "panel1";
         panel1.Size = new Size(1315, 66);
         panel1.TabIndex = 2;
+        // 
+        // button2
+        // 
+        button2.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        button2.BackColor = Color.FromArgb(55, 67, 109);
+        button2.ForeColor = SystemColors.ButtonHighlight;
+        button2.Location = new Point(1102, 10);
+        button2.Name = "button2";
+        button2.Size = new Size(79, 50);
+        button2.TabIndex = 2;
+        button2.Text = "Grafikler";
+        button2.UseVisualStyleBackColor = false;
+        button2.Click += button2_Click;
         // 
         // label1
         // 
@@ -134,7 +149,7 @@ partial class Main
         dataGridView1.RowTemplate.Height = 50;
         dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         dataGridView1.Size = new Size(1057, 598);
-        dataGridView1.TabIndex = 9;
+        dataGridView1.TabIndex = 11;
         // 
         // Main
         // 
@@ -158,6 +173,7 @@ partial class Main
     private Panel panel1;
     private Button button1;
     private TreeView treeView1;
-    private DataGridView dataGridView1;
     private Label label1;
+    private Button button2;
+    private DataGridView dataGridView1;
 }

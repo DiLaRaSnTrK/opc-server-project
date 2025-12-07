@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Security.Cryptography.Xml;
 using System.Windows.Forms;
 using Core.Database; // DatabaseService
 using Core.Models;
 using Core.Protocols;
 using UI.Forms;
+
 
 namespace UI
 {
@@ -12,7 +14,7 @@ namespace UI
     {
         private List<Channel> channelsList;
         private DatabaseService db;
-
+        
         private ContextMenuStrip menuConnectivity;
         private ContextMenuStrip menuChannel;
         private ContextMenuStrip menuDevice;
@@ -39,7 +41,7 @@ namespace UI
             var addChannel = new ToolStripMenuItem("Yeni Channel Ekle", addIcon, OnAddChannelClick);
 
             menuConnectivity.Items.Add(addChannel);
-           
+
 
             // Channel menüsü (Device ekleme/silme)
             menuChannel = new ContextMenuStrip();
@@ -334,6 +336,8 @@ namespace UI
                         selectedTag.LastUpdated = DateTime.Now;
 
                         db.UpdateTagValue(selectedTag, val);
+                        db.InsertHistory(selectedTag.TagId, val, selectedTag.LastUpdated.Value);
+
 
                         // DGV güncelle
                         foreach (DataGridViewRow row in dataGridView1.Rows)
@@ -360,5 +364,37 @@ namespace UI
             MessageBox.Show("Lütfen bir cihaz veya tag seçin!");
         }
 
+        private void button2_Click(object sender, EventArgs e)
+        {
+            if (treeView1.SelectedNode?.Tag is Tag tag)
+            {
+                var chartForm = new HistoryChartForm(tag);
+                chartForm.Show();
+            }
+            else
+            {
+                MessageBox.Show("Lütfen bir tag seçin!");
+            }
+            /*if (treeView1.SelectedNode == null)
+            {
+                MessageBox.Show("Lütfen bir cihaz veya tag seçin!");
+                return;
+            }
+            // ===================== DEVICE GEÇMİŞ GÖSTERME =====================
+            if (treeView1.SelectedNode.Tag is Device selectedDevice)
+            {
+                var historyForm = new HistoryForm(selectedDevice);
+                historyForm.ShowDialog();
+                return;
+            }
+            // ===================== TAG GEÇMİŞ GÖSTERME =====================
+            if (treeView1.SelectedNode.Tag is Tag selectedTag)
+            {
+                var historyForm = new HistoryForm(selectedTag);
+                historyForm.ShowDialog();
+                return;
+            }
+            MessageBox.Show("Lütfen bir cihaz veya tag seçin!");*/
+        }
     }
 }
