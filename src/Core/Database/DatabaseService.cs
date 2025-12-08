@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
 using Core.Models;
+using Core.Helpers;
 
 namespace Core.Database
 {
@@ -193,42 +194,16 @@ namespace Core.Database
             using var con = new SqliteConnection($"Data Source={_dbPath}");
             con.Open();
 
-            object dbValue = rawValue;
-
-            switch (tag.DataType)
-            {
-                case TagDataType.Bool:
-                    dbValue = rawValue == 1 ? 1 : 0;
-                    break;
-
-                case TagDataType.Int16:
-                    dbValue = (short)rawValue;
-                    break;
-
-                case TagDataType.UInt16:
-                    dbValue = (ushort)rawValue;
-                    break;
-
-                case TagDataType.Int32:
-                    dbValue = (int)rawValue;
-                    break;
-
-                case TagDataType.UInt32:
-                    dbValue = (uint)rawValue;
-                    break;
-
-                case TagDataType.Float:
-                    dbValue = (float)rawValue;
-                    break;
-
-                case TagDataType.Double:
-                    dbValue = rawValue;
-                    break;
-            }
+            // TagValueParser kullandığın için bu satır harika, aynen kalsın
+            object dbValue = TagValueParser.Convert(tag.DataType, rawValue);
 
             using var cmd = con.CreateCommand();
-            cmd.CommandText =
-                "UPDATE Tags SET LastValue = @v, LastUpdated = @lu WHERE TagId = @id";
+
+            // DÜZELTME BURADA:
+            // SQL komutuna "INSERT INTO TagHistory..." satırını ekliyoruz.
+            cmd.CommandText = @"
+            UPDATE Tags SET LastValue = @v, LastUpdated = @lu WHERE TagId = @id;
+            INSERT INTO TagHistory (TagId, Value, Timestamp) VALUES (@id, @v, @lu);";
 
             cmd.Parameters.AddWithValue("@v", dbValue);
             cmd.Parameters.AddWithValue("@lu", DateTime.Now.ToString("o"));
@@ -238,7 +213,7 @@ namespace Core.Database
         }
 
         #endregion
-        public void InsertHistory(int tagId, double value, DateTime ts)
+        /*public void InsertHistory(int tagId, double value, DateTime ts)
         {
             using var con = new SqliteConnection($"Data Source={_dbPath}");
             con.Open();
@@ -252,28 +227,51 @@ namespace Core.Database
             cmd.Parameters.AddWithValue("@ts", ts.ToString("o"));
 
             cmd.ExecuteNonQuery();
+        }*/
+
+        // 1. VERSİYON: Sadece son 100 veriyi getirir (Testler ve Canlı Grafik için)
+        public List<(DateTime Timestamp, double Value)> GetTagHistory(int tagId)
+        {
+            var list = new List<(DateTime, double)>();
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+
+            using var cmd = con.CreateCommand();
+            // Son 100 kayıt
+            cmd.CommandText = "SELECT Timestamp, Value FROM TagHistory WHERE TagId=@id ORDER BY Id DESC LIMIT 100";
+            cmd.Parameters.AddWithValue("@id", tagId);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (DateTime.TryParse(reader.GetString(0), out DateTime dt))
+                {
+                    list.Add((dt, reader.GetDouble(1)));
+                }
+            }
+            list.Reverse(); // Grafikte soldan sağa akması için
+            return list;
         }
 
-        // Tarih aralığına göre veri getiren yeni metot
+        // 2. VERSİYON: Tarih aralığına göre getirir (Filtreleme Ekranı için)
         public List<(DateTime Timestamp, double Value)> GetTagHistory(int tagId, DateTime startDate, DateTime endDate)
         {
             var list = new List<(DateTime, double)>();
             using var con = new SqliteConnection($"Data Source={_dbPath}");
             con.Open();
-            using var cmd = con.CreateCommand();
 
-            // SQLite'ta tarihler string (ISO8601) tutulduğu için string karşılaştırması yapıyoruz.
-            // Başlangıç gününün sabahı (00:00) ile bitiş gününün gecesi (23:59) arasını alıyoruz.
+            using var cmd = con.CreateCommand();
+            // Belirli tarih aralığı
             cmd.CommandText = @"
         SELECT Timestamp, Value 
         FROM TagHistory 
         WHERE TagId=@id 
           AND Timestamp >= @start 
           AND Timestamp <= @end 
-        ORDER BY Timestamp ASC"; // Grafikte soldan sağa akış için ASC önemli
+        ORDER BY Timestamp ASC";
 
             cmd.Parameters.AddWithValue("@id", tagId);
-            cmd.Parameters.AddWithValue("@start", startDate.ToString("o")); // ISO format
+            cmd.Parameters.AddWithValue("@start", startDate.ToString("o"));
             cmd.Parameters.AddWithValue("@end", endDate.ToString("o"));
 
             using var reader = cmd.ExecuteReader();

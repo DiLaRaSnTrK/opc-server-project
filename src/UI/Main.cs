@@ -336,7 +336,7 @@ namespace UI
                         selectedTag.LastUpdated = DateTime.Now;
 
                         db.UpdateTagValue(selectedTag, val);
-                        db.InsertHistory(selectedTag.TagId, val, selectedTag.LastUpdated.Value);
+                        //db.InsertHistory(selectedTag.TagId, val, selectedTag.LastUpdated.Value);
 
 
                         // DGV güncelle
