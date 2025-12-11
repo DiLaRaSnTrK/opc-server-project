@@ -24,27 +24,31 @@ namespace UI.Forms
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            // 1. İsim Kontrolü
             if (string.IsNullOrWhiteSpace(txtName.Text))
             {
-                MessageBox.Show("Tag adı zorunlu!");
+                MessageBox.Show("Tag adı zorunludur!", "Eksik Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            if (!int.TryParse(txtAddress.Text, out int address))
+            // 2. Register Tipi Kontrolü
+            if (cmbRegister.SelectedIndex == -1)
             {
-                MessageBox.Show("Adres sayısal olmalı!");
+                MessageBox.Show("Lütfen bir Register Tipi seçiniz!", "Eksik Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(cmbRegister.Text))
+            // 3. Adres Kontrolü (Negatif olamaz)
+            if (!int.TryParse(txtAddress.Text, out int address) || address < 0)
             {
-                MessageBox.Show("Bir Register Type seçiniz!");
+                MessageBox.Show("Geçerli bir Register Adresi giriniz (Pozitif tam sayı)!", "Format Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            if (!Enum.TryParse(cmbDataType.Text, out TagDataType parsedDataType))
+            // 4. Veri Tipi Kontrolü
+            if (cmbDataType.SelectedIndex == -1 || !Enum.TryParse(cmbDataType.Text, out TagDataType parsedDataType))
             {
-                MessageBox.Show("Bir Data Type seçiniz!");
+                MessageBox.Show("Lütfen bir Veri Tipi (Data Type) seçiniz!", "Eksik Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -53,11 +57,13 @@ namespace UI.Forms
                 Name = txtName.Text,
                 Description = txtDescription.Text,
                 Address = address,
-                RegisterType = cmbRegister.Text,        // STRING ✔
-                DataType = parsedDataType,              // ENUM ✔
-                Value = null,                           // Cihazdan okunacak
-                LastUpdated = null                      // İlk başta boş
+                RegisterType = cmbRegister.Text,
+                DataType = parsedDataType,
+                Value = null,
+                LastUpdated = null
             };
+
+            MessageBox.Show("Tag başarıyla eklendi.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             DialogResult = DialogResult.OK;
             Close();

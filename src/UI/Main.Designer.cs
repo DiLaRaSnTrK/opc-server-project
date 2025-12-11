@@ -28,15 +28,18 @@ partial class Main
     /// </summary>
     private void InitializeComponent()
     {
-        DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
-        DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
-        DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+        components = new System.ComponentModel.Container();
+        DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+        DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+        DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
         panel1 = new Panel();
+        chkAutoRead = new CheckBox();
         button2 = new Button();
         label1 = new Label();
         button1 = new Button();
         treeView1 = new TreeView();
         dataGridView1 = new DataGridView();
+        timer1 = new System.Windows.Forms.Timer(components);
         panel1.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
         SuspendLayout();
@@ -44,6 +47,7 @@ partial class Main
         // panel1
         // 
         panel1.BackColor = Color.FromArgb(55, 67, 109);
+        panel1.Controls.Add(chkAutoRead);
         panel1.Controls.Add(button2);
         panel1.Controls.Add(label1);
         panel1.Controls.Add(button1);
@@ -52,6 +56,20 @@ partial class Main
         panel1.Name = "panel1";
         panel1.Size = new Size(1315, 66);
         panel1.TabIndex = 2;
+        // 
+        // chkAutoRead
+        // 
+        chkAutoRead.Appearance = Appearance.Button;
+        chkAutoRead.AutoSize = true;
+        chkAutoRead.ForeColor = SystemColors.ActiveCaptionText;
+        chkAutoRead.Location = new Point(872, 20);
+        chkAutoRead.MaximumSize = new Size(200, 30);
+        chkAutoRead.Name = "chkAutoRead";
+        chkAutoRead.Size = new Size(200, 30);
+        chkAutoRead.TabIndex = 3;
+        chkAutoRead.Text = "   Otomatik Okuma Başlat   ";
+        chkAutoRead.UseVisualStyleBackColor = true;
+        chkAutoRead.CheckedChanged += chkAutoRead_CheckedChanged;
         // 
         // button2
         // 
@@ -111,24 +129,24 @@ partial class Main
         dataGridView1.BackgroundColor = Color.White;
         dataGridView1.CellBorderStyle = DataGridViewCellBorderStyle.RaisedHorizontal;
         dataGridView1.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
-        dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleCenter;
-        dataGridViewCellStyle1.BackColor = Color.SteelBlue;
-        dataGridViewCellStyle1.Font = new Font("Segoe UI", 9F);
-        dataGridViewCellStyle1.ForeColor = SystemColors.ButtonHighlight;
-        dataGridViewCellStyle1.SelectionBackColor = Color.SteelBlue;
-        dataGridViewCellStyle1.SelectionForeColor = SystemColors.ButtonHighlight;
-        dataGridViewCellStyle1.WrapMode = DataGridViewTriState.True;
-        dataGridView1.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle1;
+        dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        dataGridViewCellStyle4.BackColor = Color.SteelBlue;
+        dataGridViewCellStyle4.Font = new Font("Segoe UI", 9F);
+        dataGridViewCellStyle4.ForeColor = SystemColors.ButtonHighlight;
+        dataGridViewCellStyle4.SelectionBackColor = Color.SteelBlue;
+        dataGridViewCellStyle4.SelectionForeColor = SystemColors.ButtonHighlight;
+        dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
+        dataGridView1.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle4;
         dataGridView1.ColumnHeadersHeight = 40;
         dataGridView1.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-        dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
-        dataGridViewCellStyle2.BackColor = Color.White;
-        dataGridViewCellStyle2.Font = new Font("Segoe UI", 9F);
-        dataGridViewCellStyle2.ForeColor = Color.Black;
-        dataGridViewCellStyle2.SelectionBackColor = Color.LightSteelBlue;
-        dataGridViewCellStyle2.SelectionForeColor = SystemColors.Desktop;
-        dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
-        dataGridView1.DefaultCellStyle = dataGridViewCellStyle2;
+        dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        dataGridViewCellStyle5.BackColor = Color.White;
+        dataGridViewCellStyle5.Font = new Font("Segoe UI", 9F);
+        dataGridViewCellStyle5.ForeColor = Color.Black;
+        dataGridViewCellStyle5.SelectionBackColor = Color.LightSteelBlue;
+        dataGridViewCellStyle5.SelectionForeColor = SystemColors.Desktop;
+        dataGridViewCellStyle5.WrapMode = DataGridViewTriState.False;
+        dataGridView1.DefaultCellStyle = dataGridViewCellStyle5;
         dataGridView1.Dock = DockStyle.Fill;
         dataGridView1.EnableHeadersVisualStyles = false;
         dataGridView1.GridColor = SystemColors.HighlightText;
@@ -136,20 +154,25 @@ partial class Main
         dataGridView1.Margin = new Padding(3, 3, 30, 3);
         dataGridView1.Name = "dataGridView1";
         dataGridView1.ReadOnly = true;
-        dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
-        dataGridViewCellStyle3.BackColor = SystemColors.ControlDarkDark;
-        dataGridViewCellStyle3.Font = new Font("Segoe UI", 9F);
-        dataGridViewCellStyle3.ForeColor = SystemColors.ButtonHighlight;
-        dataGridViewCellStyle3.SelectionBackColor = SystemColors.ControlLight;
-        dataGridViewCellStyle3.SelectionForeColor = SystemColors.ControlText;
-        dataGridViewCellStyle3.WrapMode = DataGridViewTriState.True;
-        dataGridView1.RowHeadersDefaultCellStyle = dataGridViewCellStyle3;
+        dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        dataGridViewCellStyle6.BackColor = SystemColors.ControlDarkDark;
+        dataGridViewCellStyle6.Font = new Font("Segoe UI", 9F);
+        dataGridViewCellStyle6.ForeColor = SystemColors.ButtonHighlight;
+        dataGridViewCellStyle6.SelectionBackColor = SystemColors.ControlLight;
+        dataGridViewCellStyle6.SelectionForeColor = SystemColors.ControlText;
+        dataGridViewCellStyle6.WrapMode = DataGridViewTriState.True;
+        dataGridView1.RowHeadersDefaultCellStyle = dataGridViewCellStyle6;
         dataGridView1.RowHeadersVisible = false;
         dataGridView1.RowHeadersWidth = 20;
         dataGridView1.RowTemplate.Height = 50;
         dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         dataGridView1.Size = new Size(1057, 598);
         dataGridView1.TabIndex = 11;
+        // 
+        // timer1
+        // 
+        timer1.Interval = 1000;
+        timer1.Tick += timer1_Tick;
         // 
         // Main
         // 
@@ -162,6 +185,8 @@ partial class Main
         Name = "Main";
         StartPosition = FormStartPosition.CenterScreen;
         Text = "Main Page";
+        FormClosing += Main_FormClosing;
+        Load += Main_Load;
         panel1.ResumeLayout(false);
         panel1.PerformLayout();
         ((System.ComponentModel.ISupportInitialize)dataGridView1).EndInit();
@@ -176,4 +201,6 @@ partial class Main
     private Label label1;
     private Button button2;
     private DataGridView dataGridView1;
+    private System.Windows.Forms.Timer timer1;
+    private CheckBox chkAutoRead;
 }

@@ -17,9 +17,12 @@ namespace ModbusTestApp
             {
                 DeviceId = 1,
                 Name = "Test PLC",
-                IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
+                IPAddress = "127.0.0.1", // burada kendi PLC IP adresini gir
                 Port = 502,
-                SlaveId = 33
+                SlaveId = 1
+                /*IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
+                Port = 502,
+                SlaveId = 33*/
             };
 
             // 2️⃣ Örnek tag oluştur (örneğin 40001 adresi)

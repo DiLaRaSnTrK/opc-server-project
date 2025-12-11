@@ -15,15 +15,17 @@ namespace UI.Forms
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            // 1. İsim Kontrolü
             if (string.IsNullOrWhiteSpace(txtName.Text))
             {
-                MessageBox.Show("Channel name boş olamaz!");
+                MessageBox.Show("Kanal adı boş olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            if (!Enum.TryParse<ProtocolType>(cmbProtocol.Text, out var protocol))
+            // 2. Protokol Seçimi Kontrolü
+            if (cmbProtocol.SelectedIndex == -1 || !Enum.TryParse<ProtocolType>(cmbProtocol.Text, out var protocol))
             {
-                MessageBox.Show("Geçerli bir protocol seçiniz!");
+                MessageBox.Show("Lütfen listeden geçerli bir protokol seçiniz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -33,6 +35,9 @@ namespace UI.Forms
                 Protocol = protocol,
                 Description = txtDescription.Text
             };
+
+            // 3. Başarı Mesajı
+            MessageBox.Show("Kanal başarıyla eklendi.", "İşlem Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             DialogResult = DialogResult.OK;
             Close();

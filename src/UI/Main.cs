@@ -14,7 +14,7 @@ namespace UI
     {
         private List<Channel> channelsList;
         private DatabaseService db;
-        
+
         private ContextMenuStrip menuConnectivity;
         private ContextMenuStrip menuChannel;
         private ContextMenuStrip menuDevice;
@@ -375,26 +375,159 @@ namespace UI
             {
                 MessageBox.Show("Lütfen bir tag seçin!");
             }
-            /*if (treeView1.SelectedNode == null)
+        }
+
+
+        private Dictionary<int, ModbusClientWrapper> _deviceConnections = new Dictionary<int, ModbusClientWrapper>();
+        private bool _isScanning = false;
+
+        private async void timer1_Tick(object sender, EventArgs e)
+        {
+            if (_isScanning) return; // Çakışmayı önle
+            _isScanning = true;
+
+            try
             {
-                MessageBox.Show("Lütfen bir cihaz veya tag seçin!");
-                return;
+                if (channelsList == null) return;
+
+                foreach (var channel in channelsList)
+                {
+                    foreach (var device in channel.Devices)
+                    {
+                        // 1. Bu cihaz için açık bir bağlantımız var mı? Yoksa oluştur.
+                        if (!_deviceConnections.ContainsKey(device.DeviceId))
+                        {
+                            _deviceConnections[device.DeviceId] = new ModbusClientWrapper(device);
+                        }
+
+                        var modbusClient = _deviceConnections[device.DeviceId];
+
+                        try
+                        {
+                            // 2. Bağlı değilse bağlanmayı dene
+                            if (!modbusClient.IsConnected)
+                            {
+                                await modbusClient.ConnectAsync();
+                            }
+
+                            // 3. Tagleri Oku
+                            foreach (var tag in device.Tags)
+                            {
+                                // Hata alırsak program patlamasın diye try-catch okuma seviyesinde de olsun
+                                try
+                                {
+                                    var result = await modbusClient.ReadTagAsync(tag);
+                                    if (result.Success)
+                                    {
+                                        var val = result.Values[0];
+                                        tag.Value = val;
+                                        tag.LastUpdated = DateTime.Now;
+                                        db.UpdateTagValue(tag, val);
+                                    }
+                                }
+                                catch (Exception)
+                                {
+                                    // Tek bir tag okunamazsa diğerine geç, döngüyü kırma
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Cihaza bağlanamazsa:
+                            // 1. Bağlantıyı listeden sil (Bir sonraki turda temiz başlangıç yapsın)
+                            if (_deviceConnections.ContainsKey(device.DeviceId))
+                            {
+                                _deviceConnections[device.DeviceId].Dispose();
+                                _deviceConnections.Remove(device.DeviceId);
+                            }
+
+                            System.Diagnostics.Debug.WriteLine($"[HATA] {device.Name} cihazına erişilemedi: {ex.Message}");
+
+                        }
+                    }
+                }
+
+                RefreshDataGridView();
             }
-            // ===================== DEVICE GEÇMİŞ GÖSTERME =====================
-            if (treeView1.SelectedNode.Tag is Device selectedDevice)
+            finally
             {
-                var historyForm = new HistoryForm(selectedDevice);
-                historyForm.ShowDialog();
-                return;
+                _isScanning = false;
             }
-            // ===================== TAG GEÇMİŞ GÖSTERME =====================
-            if (treeView1.SelectedNode.Tag is Tag selectedTag)
+        }
+
+        private void chkAutoRead_CheckedChanged(object sender, EventArgs e)
+        {
+            if (chkAutoRead.Checked)
             {
-                var historyForm = new HistoryForm(selectedTag);
-                historyForm.ShowDialog();
-                return;
+                timer1.Start();
+                chkAutoRead.Text = "Otomatik Okuma: AKTİF";
+                chkAutoRead.BackColor = Color.LightGreen; // Görsel geri bildirim
             }
-            MessageBox.Show("Lütfen bir cihaz veya tag seçin!");*/
+            else
+            {
+                timer1.Stop();
+                chkAutoRead.Text = "Otomatik Okuma Başlat";
+                chkAutoRead.BackColor = Color.Transparent;
+            }
+        }
+
+        private void RefreshDataGridView()
+        {
+            // Eğer DataGridView'da o an bir liste varsa, değerleri güncelle
+            if (dataGridView1.Rows.Count > 0)
+            {
+                // Seçili olan node'a göre güncelleme yap
+                // Basitçe tüm satırları gezip Tag nesnesindeki güncel değeri hücreye yazalım
+
+                // Cihaz seçiliyse (Tag listesi vardır)
+                if (treeView1.SelectedNode?.Tag is Device selectedDevice)
+                {
+                    foreach (DataGridViewRow row in dataGridView1.Rows)
+                    {
+                        // Tag ismini ilk kolondan alıp eşleştirelim
+                        string tagName = row.Cells[0].Value?.ToString();
+                        var tag = selectedDevice.Tags.FirstOrDefault(t => t.Name == tagName);
+
+                        if (tag != null)
+                        {
+                            row.Cells["Value"].Value = tag.Value;
+                            row.Cells["Updated"].Value = tag.LastUpdated;
+                        }
+                    }
+                }
+            }
+        }
+
+        private void Main_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Main_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // 1. Önce Timer'ı durdur (Arka planda yeni okuma yapmaya çalışmasın)
+            if (timer1 != null)
+            {
+                timer1.Stop();
+            }
+
+            // 2. Açık olan tüm Modbus bağlantılarını tek tek kapat
+            if (_deviceConnections != null)
+            {
+                foreach (var client in _deviceConnections.Values)
+                {
+                    try
+                    {
+                        // Bağlantıyı güvenli bir şekilde sonlandır
+                        client.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        // Kapanırken hata alırsak yutalım, programın kapanmasına engel olmasın
+                    }
+                }
+                _deviceConnections.Clear(); // Listeyi temizle
+            }
         }
     }
 }

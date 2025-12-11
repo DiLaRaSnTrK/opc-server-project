@@ -95,6 +95,11 @@ namespace UI.Forms
         {
 
         }
+
+        private void HistoryChartForm_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }
 
