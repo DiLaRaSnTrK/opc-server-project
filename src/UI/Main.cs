@@ -15,6 +15,8 @@ namespace UI
         private List<Channel> channelsList;
         private DatabaseService db;
 
+        private EasyModbus.ModbusServer _modbusServer;
+
         private ContextMenuStrip menuConnectivity;
         private ContextMenuStrip menuChannel;
         private ContextMenuStrip menuDevice;
@@ -26,8 +28,24 @@ namespace UI
             db = new DatabaseService();
             CreateContextMenus();
 
+            StartModbusServer();
+
             LoadChannelsFromDb();
             LoadTreeView();
+        }
+
+        private void StartModbusServer()
+        {
+            try
+            {
+                _modbusServer = new EasyModbus.ModbusServer();
+                _modbusServer.Port = 5020; // Standart 502 portu dolu olabilir, 5020 güvenlidir.
+                _modbusServer.Listen(); // Sunucuyu dinlemeye başla
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Modbus Sunucusu başlatılamadı: {ex.Message}");
+            }
         }
 
         // ---------------- Context Menüler ----------------
@@ -423,6 +441,13 @@ namespace UI
                                         tag.Value = val;
                                         tag.LastUpdated = DateTime.Now;
                                         db.UpdateTagValue(tag, val);
+
+                                        if (tag.TagId > 0 && tag.TagId < 65535)
+                                        {
+                                            // Değeri Modbus Sunucusunun Holding Register'ına kopyala
+                                            // Doğru: Oluşturduğunuz "_modbusServer" nesnesini kullanmalısınız
+                                            _modbusServer.holdingRegisters[tag.TagId] = (short)val;
+                                        }
                                     }
                                 }
                                 catch (Exception)
@@ -437,7 +462,7 @@ namespace UI
                             // 1. Bağlantıyı listeden sil (Bir sonraki turda temiz başlangıç yapsın)
                             if (_deviceConnections.ContainsKey(device.DeviceId))
                             {
-                                _deviceConnections[device.DeviceId].Dispose();
+                                try { _deviceConnections[device.DeviceId].Dispose(); } catch { }
                                 _deviceConnections.Remove(device.DeviceId);
                             }
 

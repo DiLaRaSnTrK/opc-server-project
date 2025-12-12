@@ -58,71 +58,78 @@ namespace Core.Protocols
             });
         }
 
+        // src/Core/Protocols/ModbusClient.cs içine
+
         public async Task<ReadResult> ReadTagAsync(Tag tag, CancellationToken ct = default)
         {
-            if (tag == null)
-                throw new ArgumentNullException(nameof(tag));
+            if (tag == null) return new ReadResult { Success = false, ErrorMessage = "Tag null" };
 
-            try
+            // Maksimum 2 deneme yapacağız (İlk deneme + 1 Retry)
+            int maxRetries = 2;
+            string lastError = "";
+
+            for (int i = 0; i < maxRetries; i++)
             {
-                if (!IsConnected)
-                    await ConnectAsync(ct);
-
-                int address = tag.Address;
-                int quantity = GetRegisterCount(tag.DataType);
-
-                double value = 0;
-
-                await Task.Run(() =>
+                try
                 {
-                    switch (tag.RegisterType)
+                    // Bağlı değilsek bağlan
+                    if (!IsConnected)
+                        await ConnectAsync(ct);
+
+                    int address = tag.Address;
+                    int quantity = GetRegisterCount(tag.DataType);
+                    double value = 0;
+
+                    await Task.Run(() =>
                     {
-                        case "HoldingRegister":
-                            var hr = _client.ReadHoldingRegisters(address, quantity);
-                            value = ConvertRegisters(hr, tag.DataType);
-                            break;
+                        // Modbus kütüphanesi bazen bağlı sansa bile kopmuş olabilir.
+                        // Okuma yaparken hata alırsak catch bloğuna düşeceğiz.
+                        switch (tag.RegisterType)
+                        {
+                            case "HoldingRegister":
+                                var hr = _client.ReadHoldingRegisters(address, quantity);
+                                value = ConvertRegisters(hr, tag.DataType);
+                                break;
 
-                        case "InputRegister":
-                            var ir = _client.ReadInputRegisters(address, quantity);
-                            value = ConvertRegisters(ir, tag.DataType);
-                            break;
+                            case "InputRegister":
+                                var ir = _client.ReadInputRegisters(address, quantity);
+                                value = ConvertRegisters(ir, tag.DataType);
+                                break;
 
-                        case "Coil":
-                            value = _client.ReadCoils(address, 1)[0] ? 1 : 0;
-                            break;
+                            case "Coil":
+                                value = _client.ReadCoils(address, 1)[0] ? 1 : 0;
+                                break;
 
-                        case "DiscreteInput":
-                            value = _client.ReadDiscreteInputs(address, 1)[0] ? 1 : 0;
-                            break;
+                            case "DiscreteInput":
+                                value = _client.ReadDiscreteInputs(address, 1)[0] ? 1 : 0;
+                                break;
+                        }
+                    }, ct);
 
-                        default:
-                            throw new Exception($"Bilinmeyen register tipi: {tag.RegisterType}");
-                    }
-                }, ct);
+                    // Başarılıysa event fırlat ve sonucu dön
+                    DataReceived?.Invoke(this, new DataReceivedEventArgs
+                    {
+                        TagId = tag.TagId,
+                        Value = value,
+                        Timestamp = DateTime.Now
+                    });
 
-                // Event
-                DataReceived?.Invoke(this, new DataReceivedEventArgs
+                    return new ReadResult { Success = true, Values = new[] { value } };
+                }
+                catch (Exception ex)
                 {
-                    TagId = tag.TagId,
-                    Value = value,
-                    Timestamp = DateTime.Now
-                });
+                    lastError = ex.Message;
 
-                return new ReadResult
-                {
-                    Success = true,
-                    Values = new[] { value }
-                };
+                    // Eğer hata IO veya Socket hatasıysa bağlantı kopmuş demektir.
+                    // Bağlantıyı tamamen kapatıp bir sonraki turda (i+1) sıfırdan bağlanmasını sağlayalım.
+                    await DisconnectAsync();
+
+                    // Döngü devam edecek ve "ConnectAsync" tekrar çağrılacak.
+                }
             }
-            catch (Exception ex)
-            {
-                return new ReadResult
-                {
-                    Success = false,
-                    Values = Array.Empty<double>(),
-                    ErrorMessage = ex.Message
-                };
-            }
+
+            // Döngü bitti ve hala başarılı olamadıysak
+            return new ReadResult { Success = false, ErrorMessage = $"Okuma başarısız: {lastError}" };
         }
 
         // Kaç register okunacağını belirler
