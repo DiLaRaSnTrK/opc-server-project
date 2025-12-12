@@ -14,7 +14,7 @@ namespace Core.Helpers
             switch (dataType)
             {
                 case TagDataType.Bool:
-                    return rawValue == 1 ? 1 : 0;
+                    return Math.Abs(rawValue - 1) < 0.00001 ? 1 : 0;
                 case TagDataType.Int16:
                     return (short)rawValue;
                 case TagDataType.UInt16:
