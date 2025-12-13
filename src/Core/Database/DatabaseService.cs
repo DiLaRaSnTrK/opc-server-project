@@ -349,7 +349,54 @@ namespace Core.Database
             cmd.ExecuteNonQuery();
         }
 
+        #region Update Methods
 
+        public void UpdateChannel(Channel ch)
+        {
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "UPDATE Channels SET Name=@n, Protocol=@p, Description=@d WHERE ChannelId=@id";
+            cmd.Parameters.AddWithValue("@n", ch.Name);
+            cmd.Parameters.AddWithValue("@p", (int)ch.Protocol);
+            cmd.Parameters.AddWithValue("@d", ch.Description ?? "");
+            cmd.Parameters.AddWithValue("@id", ch.ChannelId);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void UpdateDevice(Device dev)
+        {
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"UPDATE Devices SET Name=@n, IPAddress=@ip, Port=@port, SlaveId=@slave, Description=@desc 
+                        WHERE DeviceId=@id";
+            cmd.Parameters.AddWithValue("@n", dev.Name);
+            cmd.Parameters.AddWithValue("@ip", dev.IPAddress);
+            cmd.Parameters.AddWithValue("@port", dev.Port);
+            cmd.Parameters.AddWithValue("@slave", dev.SlaveId);
+            cmd.Parameters.AddWithValue("@desc", dev.Description ?? "");
+            cmd.Parameters.AddWithValue("@id", dev.DeviceId);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void UpdateTag(Tag tag)
+        {
+            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"UPDATE Tags SET Name=@n, Address=@addr, RegisterType=@reg, DataType=@dt, Description=@desc 
+                        WHERE TagId=@id";
+            cmd.Parameters.AddWithValue("@n", tag.Name);
+            cmd.Parameters.AddWithValue("@addr", tag.Address);
+            cmd.Parameters.AddWithValue("@reg", tag.RegisterType);
+            cmd.Parameters.AddWithValue("@dt", (int)tag.DataType);
+            cmd.Parameters.AddWithValue("@desc", tag.Description ?? "");
+            cmd.Parameters.AddWithValue("@id", tag.TagId);
+            cmd.ExecuteNonQuery();
+        }
+
+        #endregion
     }
 
 }

@@ -6,24 +6,59 @@ namespace UI.Forms
 {
     public partial class AddTagForm : Form
     {
-        public Tag NewTag { get; private set; }
+        // Form dışından erişilecek veri nesnemiz
+        public Tag TagData { get; private set; }
 
+        // Düzenleme modunda mıyız kontrolü (İleride gerekirse diye)
+        private bool _isEditMode = false;
+
+        // 1. STANDART CONSTRUCTOR (Yeni Ekleme İçin)
         public AddTagForm()
         {
             InitializeComponent();
 
-            // Register türlerini manuel ekliyoruz (string olduğu için enum'a gerek yok)
+            // Register türlerini doldur
             cmbRegister.Items.Add("HoldingRegister");
             cmbRegister.Items.Add("InputRegister");
             cmbRegister.Items.Add("Coil");
             cmbRegister.Items.Add("DiscreteInput");
 
-            // DataType enum ile dolduruluyor
+            // Data türlerini Enum'dan doldur
             cmbDataType.Items.AddRange(Enum.GetNames(typeof(TagDataType)));
+
+            // Yeni boş bir Tag nesnesi oluştur
+            TagData = new Tag();
+        }
+
+        // 2. DÜZENLEME CONSTRUCTOR'I (Var Olanı Düzenlemek İçin)
+        // DİKKAT: ": this()" sayesinde önce yukarıdaki parametresiz constructor çalışır.
+        // Böylece InitializeComponent çalışır ve Combobox'lar dolar.
+        public AddTagForm(Tag existingTag) : this()
+        {
+            _isEditMode = true;
+            TagData = existingTag; // Gelen veriyi tut
+
+            // Form alanlarını doldur
+            txtName.Text = existingTag.Name;
+            txtAddress.Text = existingTag.Address.ToString();
+            txtDescription.Text = existingTag.Description;
+
+            // Combobox seçimlerini yap
+            if (!string.IsNullOrEmpty(existingTag.RegisterType))
+            {
+                cmbRegister.SelectedItem = existingTag.RegisterType;
+            }
+
+            cmbDataType.SelectedItem = existingTag.DataType.ToString();
+
+            // Form başlığını değiştir
+            this.Text = "Tag Düzenle";
         }
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            // --- VALIDASYONLAR ---
+
             // 1. İsim Kontrolü
             if (string.IsNullOrWhiteSpace(txtName.Text))
             {
@@ -38,7 +73,7 @@ namespace UI.Forms
                 return;
             }
 
-            // 3. Adres Kontrolü (Negatif olamaz)
+            // 3. Adres Kontrolü
             if (!int.TryParse(txtAddress.Text, out int address) || address < 0)
             {
                 MessageBox.Show("Geçerli bir Register Adresi giriniz (Pozitif tam sayı)!", "Format Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -52,22 +87,24 @@ namespace UI.Forms
                 return;
             }
 
-            NewTag = new Tag
-            {
-                Name = txtName.Text,
-                Description = txtDescription.Text,
-                Address = address,
-                RegisterType = cmbRegister.Text,
-                DataType = parsedDataType,
-                Value = null,
-                LastUpdated = null
-            };
+            // --- KAYIT / GÜNCELLEME ---
 
-            MessageBox.Show("Tag başarıyla eklendi.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // TagData nesnesini formdaki verilerle güncelle
+            TagData.Name = txtName.Text;
+            TagData.Address = address;
+            TagData.RegisterType = cmbRegister.Text;
+            TagData.DataType = parsedDataType;
+            TagData.Description = txtDescription.Text;
+
+            // Eğer yeni ekliyorsak (Value null ise) varsayılan değerleri koru veya ayarla
+            if (!_isEditMode)
+            {
+                TagData.Value = null;
+                TagData.LastUpdated = null;
+            }
 
             DialogResult = DialogResult.OK;
             Close();
         }
-
     }
 }

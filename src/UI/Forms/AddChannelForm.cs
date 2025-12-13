@@ -6,42 +6,46 @@ namespace UI.Forms
 {
     public partial class AddChannelForm : Form
     {
-        public Channel NewChannel { get; private set; }
+        public Channel ChannelData { get; private set; } // İsmini genel yaptım
+        private bool _isEditMode = false;
 
+        // 1. Boş Constructor (Ekleme için)
         public AddChannelForm()
         {
             InitializeComponent();
+            ChannelData = new Channel(); // Yeni boş nesne
+        }
+
+        // 2. Dolu Constructor (Düzenleme için)
+        public AddChannelForm(Channel existingChannel)
+        {
+            InitializeComponent();
+            _isEditMode = true;
+            ChannelData = existingChannel;
+
+            // Formu doldur
+            txtName.Text = existingChannel.Name;
+            txtDescription.Text = existingChannel.Description;
+            cmbProtocol.Text = existingChannel.Protocol.ToString(); // Enum'ı string'e çevirip seç
+
+            this.Text = "Kanal Düzenle"; // Başlığı değiştir
         }
 
         private void btnSave_Click(object sender, EventArgs e)
         {
-            // 1. İsim Kontrolü
-            if (string.IsNullOrWhiteSpace(txtName.Text))
-            {
-                MessageBox.Show("Kanal adı boş olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            // Validasyonlar (Aynen kalsın)
+            if (string.IsNullOrWhiteSpace(txtName.Text)) { MessageBox.Show("İsim giriniz"); return; }
+            if (!Enum.TryParse<ProtocolType>(cmbProtocol.Text, out var protocol)) { MessageBox.Show("Protokol seçiniz"); return; }
 
-            // 2. Protokol Seçimi Kontrolü
-            if (cmbProtocol.SelectedIndex == -1 || !Enum.TryParse<ProtocolType>(cmbProtocol.Text, out var protocol))
-            {
-                MessageBox.Show("Lütfen listeden geçerli bir protokol seçiniz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            NewChannel = new Channel
-            {
-                Name = txtName.Text,
-                Protocol = protocol,
-                Description = txtDescription.Text
-            };
-
-            // 3. Başarı Mesajı
-            MessageBox.Show("Kanal başarıyla eklendi.", "İşlem Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // Nesneyi güncelle
+            ChannelData.Name = txtName.Text;
+            ChannelData.Protocol = protocol;
+            ChannelData.Description = txtDescription.Text;
 
             DialogResult = DialogResult.OK;
             Close();
         }
+
 
         private void AddChannelForm_Load(object sender, EventArgs e)
         {

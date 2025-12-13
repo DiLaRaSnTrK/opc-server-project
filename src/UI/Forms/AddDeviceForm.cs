@@ -6,13 +6,32 @@ using System.Net;
 
 namespace UI.Forms
 {
+
     public partial class AddDeviceForm : Form
     {
-        public Device NewDevice { get; private set; }
+        public Device DeviceData { get; private set; }
+        private bool _isEditMode = false;
 
         public AddDeviceForm()
         {
             InitializeComponent();
+            DeviceData = new Device();
+        }
+
+        public AddDeviceForm(Device existingDevice)
+        {
+            InitializeComponent();
+            _isEditMode = true;
+            DeviceData = existingDevice;
+
+            // Doldur
+            txtName.Text = existingDevice.Name;
+            txtIP.Text = existingDevice.IPAddress;
+            txtPort.Text = existingDevice.Port.ToString();
+            txtSlaveId.Text = existingDevice.SlaveId.ToString();
+            txtDescription.Text = existingDevice.Description;
+
+            this.Text = "Cihaz Düzenle";
         }
 
         private void btnSave_Click(object sender, EventArgs e)
@@ -46,22 +65,15 @@ namespace UI.Forms
                 return;
             }
 
-            // Nesneyi Oluştur
-            NewDevice = new Device
-            {
-                Name = txtName.Text,
-                IPAddress = txtIP.Text,
-                Port = port,
-                SlaveId = slave,
-                Description = txtDescription.Text
-            };
-
-            // 5. Başarı Mesajı (YENİ)
-            MessageBox.Show("Cihaz başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // Verileri güncelle
+            DeviceData.Name = txtName.Text;
+            DeviceData.IPAddress = txtIP.Text;
+            DeviceData.Port = int.Parse(txtPort.Text);
+            DeviceData.SlaveId = byte.Parse(txtSlaveId.Text);
+            DeviceData.Description = txtDescription.Text;
 
             DialogResult = DialogResult.OK;
             Close();
         }
-
     }
 }

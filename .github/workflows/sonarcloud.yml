@@ -43,12 +43,10 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: powershell
         run: |
-          # DÜZELTME 1: Yol ${{ runner.temp }}\scanner olarak düzeltildi
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"DiLaRaSnTrK_opc-server-project" /o:"dilara-sntrk11" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"DiLaRaSnTrK_opc-server-project" /o:"dilara-sntrk11" /d:sonar.token="$env:SONAR_TOKEN" /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" /d:sonar.exclusions="**/UI/**,**/TestApp/**"
           
           dotnet build
           
-          # DÜZELTME 2: coverlet.collector için doğru komut yazıldı (--collect)
           dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage;Format=opencover"
           
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"

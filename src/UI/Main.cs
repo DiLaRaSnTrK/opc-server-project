@@ -89,11 +89,24 @@ namespace UI
         {
             if (treeView1.SelectedNode?.Tag is Channel ch)
             {
-                if (MessageBox.Show($"'{ch.Name}' kanalını silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                // 1. ONAY İSTE
+                var result = MessageBox.Show(
+                    $"'{ch.Name}' kanalını silmek istediğinize emin misiniz?\n\n" +
+                    "DİKKAT: Bu kanala bağlı TÜM CİHAZLAR ve TAGLER de silinecektir!",
+                    "Kritik Silme Onayı",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+
+                if (result == DialogResult.Yes)
                 {
+                    // 2. SİL
                     db.DeleteChannel(ch.ChannelId);
                     channelsList.Remove(ch);
                     LoadTreeView();
+
+                    // 3. BİLDİRİM VER (YENİ)
+                    MessageBox.Show($"'{ch.Name}' kanalı ve altındaki tüm veriler başarıyla silindi.", "İşlem Tamamlandı", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
         }
@@ -102,12 +115,31 @@ namespace UI
         {
             if (treeView1.SelectedNode?.Tag is Device dev)
             {
-                if (MessageBox.Show($"'{dev.Name}' cihazını silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                // 1. ONAY İSTE
+                var result = MessageBox.Show(
+                    $"'{dev.Name}' cihazını silmek istediğinize emin misiniz?\n\n" +
+                    "Bu cihaza ait tüm tagler ve geçmiş veriler silinecektir.",
+                    "Cihaz Silme Onayı",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+
+                if (result == DialogResult.Yes)
                 {
+                    // 2. BAĞLANTIYI KES VE SİL
+                    if (_deviceConnections.ContainsKey(dev.DeviceId))
+                    {
+                        try { _deviceConnections[dev.DeviceId].Dispose(); } catch { }
+                        _deviceConnections.Remove(dev.DeviceId);
+                    }
+
                     db.DeleteDevice(dev.DeviceId);
                     var parentChannel = treeView1.SelectedNode.Parent?.Tag as Channel;
                     parentChannel?.Devices.Remove(dev);
                     LoadTreeView();
+
+                    // 3. BİLDİRİM VER (YENİ)
+                    MessageBox.Show($"'{dev.Name}' cihazı başarıyla silindi.", "İşlem Tamamlandı", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
         }
@@ -116,12 +148,23 @@ namespace UI
         {
             if (treeView1.SelectedNode?.Tag is Tag tag)
             {
-                if (MessageBox.Show($"'{tag.Name}' tagini silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                // 1. ONAY İSTE
+                var result = MessageBox.Show(
+                    $"'{tag.Name}' tagini silmek istediğinize emin misiniz?",
+                    "Tag Silme Onayı",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
                 {
+                    // 2. SİL
                     db.DeleteTag(tag.TagId);
                     var parentDevice = treeView1.SelectedNode.Parent?.Tag as Device;
                     parentDevice?.Tags.Remove(tag);
                     LoadTreeView();
+
+                    // 3. BİLDİRİM VER (YENİ)
+                    MessageBox.Show($"'{tag.Name}' tagi başarıyla silindi.", "İşlem Tamamlandı", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
         }
@@ -241,10 +284,11 @@ namespace UI
             var f = new AddChannelForm();
             if (f.ShowDialog() == DialogResult.OK)
             {
-                var newCh = f.NewChannel;
+                var newCh = f.ChannelData;
                 newCh.ChannelId = db.AddChannel(newCh);
                 channelsList.Add(newCh);
                 LoadTreeView();
+                MessageBox.Show("Kanal eklendi.");
             }
         }
 
@@ -255,11 +299,12 @@ namespace UI
                 var f = new AddDeviceForm();
                 if (f.ShowDialog() == DialogResult.OK)
                 {
-                    var newDev = f.NewDevice;
+                    var newDev = f.DeviceData;
                     newDev.ChannelId = ch.ChannelId;
                     newDev.DeviceId = db.AddDevice(newDev);
                     ch.Devices.Add(newDev);
                     LoadTreeView();
+                    MessageBox.Show("Cihaz eklendi.");
                 }
             }
         }
@@ -271,11 +316,12 @@ namespace UI
                 var f = new AddTagForm();
                 if (f.ShowDialog() == DialogResult.OK)
                 {
-                    var newTag = f.NewTag;
+                    var newTag = f.TagData;
                     newTag.DeviceId = dev.DeviceId;
                     newTag.TagId = db.AddTag(newTag);
                     dev.Tags.Add(newTag);
                     LoadTreeView();
+                    MessageBox.Show("Tag eklendi.");
                 }
             }
         }
@@ -552,6 +598,54 @@ namespace UI
                     }
                 }
                 _deviceConnections.Clear(); // Listeyi temizle
+            }
+        }
+
+        private void treeView1_NodeMouseDoubleClick_1(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            // 1. KANAL DÜZENLEME
+            if (e.Node.Tag is Channel ch)
+            {
+                // Formu 'ch' parametresiyle açıyoruz (Edit Modu)
+                var f = new AddChannelForm(ch);
+                if (f.ShowDialog() == DialogResult.OK)
+                {
+                    // Form kapandı, nesne güncellendi. Şimdi DB'ye yazalım.
+                    db.UpdateChannel(f.ChannelData);
+
+                    // Ağacı yenile (İsim değişmiş olabilir)
+                    LoadTreeView();
+                    MessageBox.Show("Kanal güncellendi.");
+                }
+            }
+            // 2. CİHAZ DÜZENLEME
+            else if (e.Node.Tag is Device dev)
+            {
+                var f = new AddDeviceForm(dev);
+                if (f.ShowDialog() == DialogResult.OK)
+                {
+                    // Eğer IP/Port değiştiyse açık bağlantıyı sıfırlamak iyi olur
+                    if (_deviceConnections.ContainsKey(dev.DeviceId))
+                    {
+                        _deviceConnections[dev.DeviceId].Dispose();
+                        _deviceConnections.Remove(dev.DeviceId);
+                    }
+
+                    db.UpdateDevice(f.DeviceData);
+                    LoadTreeView();
+                    MessageBox.Show("Cihaz güncellendi.");
+                }
+            }
+            // 3. TAG DÜZENLEME
+            else if (e.Node.Tag is Tag tag)
+            {
+                var f = new AddTagForm(tag);
+                if (f.ShowDialog() == DialogResult.OK)
+                {
+                    db.UpdateTag(f.TagData);
+                    LoadTreeView();
+                    MessageBox.Show("Tag güncellendi.");
+                }
             }
         }
     }
