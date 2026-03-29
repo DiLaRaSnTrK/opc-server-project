@@ -1,16 +1,35 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Core.Models;
-using Core.Protocols;
-
+﻿using Core.Database;
+using Infrastructure.OPC;
 namespace ModbusTestApp
 {
     internal class Program
     {
         static async Task Main(string[] args)
         {
-            Console.WriteLine("=== Modbus TCP Test Başlatılıyor ===");
+
+            var opcTagUpdater = new OpcTagUpdater();
+            var db = new DatabaseService("system.db", opcTagUpdater);
+
+            var opcServer = new OpcServerService(opcTagUpdater);
+            await opcServer.StartAsync(); // artık async değil, await yok
+
+            // Sahte veri üretimi
+            _ = Task.Run(async () =>
+            {
+                int temp = 20;
+                while (true)
+                {
+                    temp++;
+                    opcTagUpdater.UpdateTag("Temperature", temp);
+                    Console.WriteLine($"Temperature = {temp}");
+                    await Task.Delay(2000);
+                }
+            });
+
+            // Uygulama kapanmasın
+            await Task.Delay(-1);
+
+            /*Console.WriteLine("=== Modbus TCP Test Başlatılıyor ===");
 
             // 1️⃣ Test için örnek cihaz oluştur
             var device = new Device
@@ -20,9 +39,9 @@ namespace ModbusTestApp
                 IPAddress = "127.0.0.1", // burada kendi PLC IP adresini gir
                 Port = 502,
                 SlaveId = 1
-                /*IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
+                *//*IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
                 Port = 502,
-                SlaveId = 33*/
+                SlaveId = 33*//*
             };
 
             // 2️⃣ Örnek tag oluştur (örneğin 40001 adresi)
@@ -76,7 +95,7 @@ namespace ModbusTestApp
             }
 
             Console.WriteLine("✅ Test tamamlandı!");
-            Console.ReadLine();
+            Console.ReadLine();*/
         }
     }
 }
