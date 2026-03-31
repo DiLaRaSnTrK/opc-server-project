@@ -1,21 +1,41 @@
-﻿using Opc.Ua;
+﻿using Core.Database;
+using Core.Models;
+using Opc.Ua;
 using Opc.Ua.Configuration;
 
 namespace Infrastructure.OPC
 {
-    // 3. OpcServerService — düzeltilmiş hali
     public class OpcServerService
     {
         private readonly OpcTagUpdater _opcTagUpdater;
+        private readonly DatabaseService _db;
         private DevSecOpsServer _server;
 
-        public OpcServerService(OpcTagUpdater opcTagUpdater)
+        public OpcServerService(OpcTagUpdater opcTagUpdater, DatabaseService db)
         {
             _opcTagUpdater = opcTagUpdater;
+            _db = db;
         }
 
         public async Task StartAsync()
         {
+            // DB'den tüm tag'leri çek
+            var allTags = new List<Tag>();
+            var channels = _db.GetChannels();
+
+            foreach (var channel in channels)
+            {
+                var devices = _db.GetDevicesByChannelId(channel.ChannelId);
+                foreach (var device in devices)
+                {
+                    var tags = _db.GetTagsByDeviceId(device.DeviceId);
+                    allTags.AddRange(tags);
+                }
+            }
+
+            Console.WriteLine($"[OPC] {allTags.Count} tag DB'den yüklendi.");
+
+            // Config
             var config = new ApplicationConfiguration
             {
                 ApplicationName = "DevSecOps OPC Server",
@@ -32,38 +52,34 @@ namespace Infrastructure.OPC
                     TrustedPeerCertificates = new CertificateTrustList
                     {
                         StoreType = @"Directory",
-                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\UA Applications",
+                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\UA Applications"
                     },
-                    TrustedIssuerCertificates = new CertificateTrustList
+                    TrustedIssuerCertificates = new CertificateTrustList  // ← bu eksikti
                     {
                         StoreType = @"Directory",
-                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\UA Certificate Authorities",
+                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\UA Certificate Authorities"
                     },
                     RejectedCertificateStore = new CertificateTrustList
                     {
                         StoreType = @"Directory",
-                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\RejectedCertificates",
+                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\RejectedCertificates"
                     },
                     AutoAcceptUntrustedCertificates = true,
                     RejectSHA1SignedCertificates = false,
                     MinimumCertificateKeySize = 1024
                 },
-                TransportConfigurations = new TransportConfigurationCollection(),
                 TransportQuotas = new TransportQuotas { OperationTimeout = 15000 },
                 ServerConfiguration = new ServerConfiguration
                 {
                     BaseAddresses = new StringCollection { "opc.tcp://0.0.0.0:4840" },
-                    MinRequestThreadCount = 5,
-                    MaxRequestThreadCount = 100,
-                    MaxQueuedRequestCount = 200,
                     SecurityPolicies = new ServerSecurityPolicyCollection
-                {
-                    new ServerSecurityPolicy
                     {
-                        SecurityMode = MessageSecurityMode.None,
-                        SecurityPolicyUri = SecurityPolicies.None
+                        new ServerSecurityPolicy
+                        {
+                            SecurityMode      = MessageSecurityMode.None,
+                            SecurityPolicyUri = SecurityPolicies.None
+                        }
                     }
-                }
                 },
                 DisableHiResClock = true
             };
@@ -71,21 +87,18 @@ namespace Infrastructure.OPC
             await config.Validate(ApplicationType.Server);
 
             var application = new ApplicationInstance(config);
+            await application.CheckApplicationInstanceCertificatesAsync(false, 2048);
 
-            // ⚠️ Bu satır kritik — certificate otomatik oluşturulur
-            bool certOk = await application.CheckApplicationInstanceCertificatesAsync(false, 2048);
-            if (!certOk)
-                throw new Exception("Certificate hatası!");
+            // Tag listesiyle server'ı başlat
+            _server = new DevSecOpsServer(allTags);
+            await application.Start(_server);
 
-            _server = new DevSecOpsServer();
-            await application.Start(_server); // Start() değil, application.Start() kullan
+            // NodeManager'ı OpcTagUpdater'a bağla
             _opcTagUpdater.SetNodeManager(_server.NodeManager);
-            Console.WriteLine("OPC Server çalışıyor: opc.tcp://localhost:4840");
+
+            Console.WriteLine($"[OPC] Server çalışıyor: opc.tcp://localhost:4840");
         }
 
-        public async Task StopAsync()
-        {
-            _server?.Stop();
-        }
+        public void Stop() => _server?.Stop();
     }
 }

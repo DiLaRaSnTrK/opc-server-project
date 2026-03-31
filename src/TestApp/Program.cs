@@ -1,4 +1,5 @@
 ﻿using Core.Database;
+using Core.Models;
 using Infrastructure.OPC;
 namespace ModbusTestApp
 {
@@ -8,25 +9,53 @@ namespace ModbusTestApp
         {
 
             var opcTagUpdater = new OpcTagUpdater();
+
             var db = new DatabaseService("system.db", opcTagUpdater);
 
-            var opcServer = new OpcServerService(opcTagUpdater);
-            await opcServer.StartAsync(); // artık async değil, await yok
-
-            // Sahte veri üretimi
-            _ = Task.Run(async () =>
+            // ✅ DB boşsa örnek veri ekle
+            if (db.GetChannels().Count == 0)
             {
-                int temp = 20;
-                while (true)
+                var channelId = db.AddChannel(new Channel
                 {
-                    temp++;
-                    opcTagUpdater.UpdateTag("Temperature", temp);
-                    Console.WriteLine($"Temperature = {temp}");
-                    await Task.Delay(2000);
-                }
-            });
+                    Name = "Test Channel",
+                    Protocol = ProtocolType.ModbusTCP,
+                    Description = "Test"
+                });
 
-            // Uygulama kapanmasın
+                var deviceId = db.AddDevice(new Device
+                {
+                    ChannelId = channelId,
+                    Name = "Test PLC",
+                    IPAddress = "127.0.0.1",
+                    Port = 502,
+                    SlaveId = 1,
+                    Description = "Test cihaz"
+                });
+
+                db.AddTag(new Tag { DeviceId = deviceId, Name = "Temperature", Address = 40003, RegisterType = "HoldingRegister", DataType = TagDataType.Float });
+                db.AddTag(new Tag { DeviceId = deviceId, Name = "Pressure1", Address = 40022, RegisterType = "HoldingRegister", DataType = TagDataType.Float });
+                db.AddTag(new Tag { DeviceId = deviceId, Name = "Status", Address = 4, RegisterType = "Coil", DataType = TagDataType.Bool });
+
+                Console.WriteLine("[DB] Örnek veri eklendi.");
+            }
+
+            var opcServer = new OpcServerService(opcTagUpdater, db);  // ← db'yi ver
+
+            await opcServer.StartAsync();
+
+            // Bridge'leri başlat
+            var channels = db.GetChannels();
+            foreach (var channel in channels)
+            {
+                foreach (var device in db.GetDevicesByChannelId(channel.ChannelId))
+                {
+                    var tags = db.GetTagsByDeviceId(device.DeviceId);
+                    if (tags.Count == 0) continue;
+
+                    new ModbusOpcBridge(db, device, tags).Start();
+                }
+            }
+
             await Task.Delay(-1);
 
             /*Console.WriteLine("=== Modbus TCP Test Başlatılıyor ===");

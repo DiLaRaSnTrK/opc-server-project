@@ -1,4 +1,5 @@
 ﻿using Core.Interfaces;
+using Core.Models;
 
 namespace Infrastructure.OPC
 {
@@ -15,6 +16,16 @@ namespace Infrastructure.OPC
         public void UpdateTag(string tagName, object value)
         {
             _nodeManager?.UpdateTag(tagName, value);
+        }
+
+        public void AddTagNode(Tag tag)
+        {
+            _nodeManager?.AddTagNode(tag);
+        }
+
+        public void RemoveTagNode(string tagName)
+        {
+            _nodeManager?.RemoveTagNode(tagName);
         }
     }
 }
