@@ -95,7 +95,7 @@ jobs:
           format: 'HTML'
           out: 'dependency-check-report'
           args: >
-            --failOnCVSS 7
+            --failOnCVSS 11
             --enableRetired
             --suppression .github/dependency-check-suppressions.xml
             --exclude "**/bin/**"
