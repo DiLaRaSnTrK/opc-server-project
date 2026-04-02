@@ -81,7 +81,7 @@ jobs:
 
       # NuGet paketlerini geri yükle (dependency-check için gerekli)
       - name: Restore NuGet packages
-        run: dotnet restore OpcServerSolution.sln
+        run: dotnet restore OpcServerSolution.sln -p:EnableWindowsTargeting=true
 
       # OWASP Dependency-Check
       # --failOnCVSS 7  → CVSS ≥ 7.0 bulunan bağımlılık varsa pipeline durur
