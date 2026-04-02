@@ -67,7 +67,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   dependency-check:
     name: "🔒 Gate-2 · Dependency Audit"
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: secret-scan          # Gate-1 geçmeden başlamaz
 
     steps:
