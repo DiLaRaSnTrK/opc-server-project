@@ -92,7 +92,7 @@ jobs:
         with:
           project: 'OpcServerSolution'
           path: '.'
-          format: 'HTML,JSON'
+          format: 'HTML'
           out: 'dependency-check-report'
           args: >
             --failOnCVSS 7
