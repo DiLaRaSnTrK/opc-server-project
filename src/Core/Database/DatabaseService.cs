@@ -1,18 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.Data.Sqlite;
+﻿using Core.Helpers;
+using Core.Interfaces;
 using Core.Models;
-using Core.Helpers;
+using Microsoft.Data.Sqlite;
+
 
 namespace Core.Database
 {
     public class DatabaseService : IDisposable
     {
         private readonly string _dbPath;
-
-        public DatabaseService(string dbPath = "system.db")
+        private readonly ITagUpdater _tagUpdater;
+        public DatabaseService(string dbPath = "system.db", ITagUpdater tagUpdater = null)
         {
             _dbPath = dbPath;
+            _tagUpdater = tagUpdater;
             Initialize();
         }
 
@@ -194,13 +195,10 @@ namespace Core.Database
             using var con = new SqliteConnection($"Data Source={_dbPath}");
             con.Open();
 
-            // TagValueParser kullandığın için bu satır harika, aynen kalsın
             object dbValue = TagValueParser.Convert(tag.DataType, rawValue);
 
             using var cmd = con.CreateCommand();
 
-            // DÜZELTME BURADA:
-            // SQL komutuna "INSERT INTO TagHistory..." satırını ekliyoruz.
             cmd.CommandText = @"
             UPDATE Tags SET LastValue = @v, LastUpdated = @lu WHERE TagId = @id;
             INSERT INTO TagHistory (TagId, Value, Timestamp) VALUES (@id, @v, @lu);";
@@ -210,6 +208,9 @@ namespace Core.Database
             cmd.Parameters.AddWithValue("@id", tag.TagId);
 
             cmd.ExecuteNonQuery();
+
+            // 🔴 OPC UPDATE BURAYA
+            _tagUpdater?.UpdateTag(tag.Name, dbValue);
         }
 
         #endregion

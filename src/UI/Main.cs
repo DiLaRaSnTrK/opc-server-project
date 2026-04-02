@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Security.Cryptography.Xml;
-using System.Windows.Forms;
-using Core.Database; // DatabaseService
+﻿using Core.Database; // DatabaseService
 using Core.Models;
 using Core.Protocols;
+using Infrastructure.OPC;
 using UI.Forms;
 
 
@@ -15,37 +12,29 @@ namespace UI
         private List<Channel> channelsList;
         private DatabaseService db;
 
-        private EasyModbus.ModbusServer _modbusServer;
 
         private ContextMenuStrip menuConnectivity;
         private ContextMenuStrip menuChannel;
         private ContextMenuStrip menuDevice;
         private ContextMenuStrip menuTag;
 
+        private OpcTagUpdater _opcTagUpdater;
+        private OpcServerService _opcServer;
         public Main()
         {
             InitializeComponent();
             db = new DatabaseService();
-            CreateContextMenus();
 
-            StartModbusServer();
+            // OPC başlat
+            _opcTagUpdater = new OpcTagUpdater();
+            db = new DatabaseService("system.db", _opcTagUpdater); // ← tagUpdater'ı ver
+            _opcServer = new OpcServerService(_opcTagUpdater, db);
+            _ = _opcServer.StartAsync(); // fire and forget
+
+            CreateContextMenus();
 
             LoadChannelsFromDb();
             LoadTreeView();
-        }
-
-        private void StartModbusServer()
-        {
-            try
-            {
-                _modbusServer = new EasyModbus.ModbusServer();
-                _modbusServer.Port = 5020; // Standart 502 portu dolu olabilir, 5020 güvenlidir.
-                _modbusServer.Listen(); // Sunucuyu dinlemeye başla
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Modbus Sunucusu başlatılamadı: {ex.Message}");
-            }
         }
 
         // ---------------- Context Menüler ----------------
@@ -157,14 +146,15 @@ namespace UI
 
                 if (result == DialogResult.Yes)
                 {
-                    // 2. SİL
                     db.DeleteTag(tag.TagId);
                     var parentDevice = treeView1.SelectedNode.Parent?.Tag as Device;
                     parentDevice?.Tags.Remove(tag);
                     LoadTreeView();
 
-                    // 3. BİLDİRİM VER (YENİ)
-                    MessageBox.Show($"'{tag.Name}' tagi başarıyla silindi.", "İşlem Tamamlandı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // ✅ OPC node'u da kaldır
+                    _opcTagUpdater.RemoveTagNode(tag.Name);
+
+                    MessageBox.Show($"'{tag.Name}' tagi başarıyla silindi.");
                 }
             }
         }
@@ -321,6 +311,10 @@ namespace UI
                     newTag.TagId = db.AddTag(newTag);
                     dev.Tags.Add(newTag);
                     LoadTreeView();
+
+                    // ✅ OPC node'u runtime'da ekle — restart gerekmez
+                    _opcTagUpdater.AddTagNode(newTag);
+
                     MessageBox.Show("Tag eklendi.");
                 }
             }
@@ -437,7 +431,7 @@ namespace UI
             }
             else
             {
-                MessageBox.Show("Lütfen bir tag seçin!");
+                MessageBox.Show("Lütfen sol menüden bir tag seçin!");
             }
         }
 
@@ -487,13 +481,6 @@ namespace UI
                                         tag.Value = val;
                                         tag.LastUpdated = DateTime.Now;
                                         db.UpdateTagValue(tag, val);
-
-                                        if (tag.TagId > 0 && tag.TagId < 65535)
-                                        {
-                                            // Değeri Modbus Sunucusunun Holding Register'ına kopyala
-                                            // Doğru: Oluşturduğunuz "_modbusServer" nesnesini kullanmalısınız
-                                            _modbusServer.holdingRegisters[tag.TagId] = (short)val;
-                                        }
                                     }
                                 }
                                 catch (Exception)
@@ -580,6 +567,14 @@ namespace UI
             if (timer1 != null)
             {
                 timer1.Stop();
+
+                _opcServer?.Stop();
+
+                foreach (var client in _deviceConnections.Values)
+                {
+                    try { client.Dispose(); } catch { }
+                }
+                _deviceConnections.Clear();
             }
 
             // 2. Açık olan tüm Modbus bağlantılarını tek tek kapat

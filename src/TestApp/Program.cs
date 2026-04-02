@@ -1,16 +1,64 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using Core.Database;
 using Core.Models;
-using Core.Protocols;
-
+using Infrastructure.OPC;
 namespace ModbusTestApp
 {
     internal class Program
     {
         static async Task Main(string[] args)
         {
-            Console.WriteLine("=== Modbus TCP Test Başlatılıyor ===");
+
+            var opcTagUpdater = new OpcTagUpdater();
+
+            var db = new DatabaseService("system.db", opcTagUpdater);
+
+            // ✅ DB boşsa örnek veri ekle
+            if (db.GetChannels().Count == 0)
+            {
+                var channelId = db.AddChannel(new Channel
+                {
+                    Name = "Test Channel",
+                    Protocol = ProtocolType.ModbusTCP,
+                    Description = "Test"
+                });
+
+                var deviceId = db.AddDevice(new Device
+                {
+                    ChannelId = channelId,
+                    Name = "Test PLC",
+                    IPAddress = "127.0.0.1",
+                    Port = 502,
+                    SlaveId = 1,
+                    Description = "Test cihaz"
+                });
+
+                db.AddTag(new Tag { DeviceId = deviceId, Name = "Temperature", Address = 40003, RegisterType = "HoldingRegister", DataType = TagDataType.Float });
+                db.AddTag(new Tag { DeviceId = deviceId, Name = "Pressure1", Address = 40022, RegisterType = "HoldingRegister", DataType = TagDataType.Float });
+                db.AddTag(new Tag { DeviceId = deviceId, Name = "Status", Address = 4, RegisterType = "Coil", DataType = TagDataType.Bool });
+
+                Console.WriteLine("[DB] Örnek veri eklendi.");
+            }
+
+            var opcServer = new OpcServerService(opcTagUpdater, db);  // ← db'yi ver
+
+            await opcServer.StartAsync();
+
+            // Bridge'leri başlat
+            var channels = db.GetChannels();
+            foreach (var channel in channels)
+            {
+                foreach (var device in db.GetDevicesByChannelId(channel.ChannelId))
+                {
+                    var tags = db.GetTagsByDeviceId(device.DeviceId);
+                    if (tags.Count == 0) continue;
+
+                    new ModbusOpcBridge(db, device, tags).Start();
+                }
+            }
+
+            await Task.Delay(-1);
+
+            /*Console.WriteLine("=== Modbus TCP Test Başlatılıyor ===");
 
             // 1️⃣ Test için örnek cihaz oluştur
             var device = new Device
@@ -20,9 +68,9 @@ namespace ModbusTestApp
                 IPAddress = "127.0.0.1", // burada kendi PLC IP adresini gir
                 Port = 502,
                 SlaveId = 1
-                /*IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
+                *//*IPAddress = "192.168.33.10", // burada kendi PLC IP adresini gir
                 Port = 502,
-                SlaveId = 33*/
+                SlaveId = 33*//*
             };
 
             // 2️⃣ Örnek tag oluştur (örneğin 40001 adresi)
@@ -76,7 +124,7 @@ namespace ModbusTestApp
             }
 
             Console.WriteLine("✅ Test tamamlandı!");
-            Console.ReadLine();
+            Console.ReadLine();*/
         }
     }
 }

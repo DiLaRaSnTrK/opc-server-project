@@ -1,0 +1,262 @@
+# ============================================================
+#  DevSecOps CI Pipeline
+#  OPC Sunucu Projesi — Aşama 6
+#
+#  Tetikleyici: Her push (main, develop, feature/*, security/*)
+#               + Her PR açılışı / güncellemesi
+#
+#  Job sırası (needs zinciri):
+#    secret-scan → dependency-check → build-test-sast
+#
+#  Security Gate'ler:
+#    Gate-1  : Gitleaks   — 0 secret
+#    Gate-2  : OWASP DC   — CVSS < 7.0 bağımlılık açığı
+#    Gate-3  : SonarCloud — Quality Gate = Passed
+# ============================================================
+
+name: DevSecOps CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'security/**'
+      - 'hotfix/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Aynı branch'e eş zamanlı çalışmayı iptal et (kaynak tasarrufu)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─────────────────────────────────────────────────────────────
+# JOB 1 — SECURITY GATE #1 : SECRET SCANNING
+# ─────────────────────────────────────────────────────────────
+jobs:
+  secret-scan:
+    name: "🔒 Gate-1 · Secret Scanning"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history — Gitleaks tüm commit'leri tarar)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # GitHub native secret scanning (repo ayarlarından da aktif edilmeli)
+      # Aşağıdaki action ek kural seti + PR annotation sağlar
+      - name: Gitleaks — Secret & Credential Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Pro lisans varsa
+
+      # Sonuç özetini job summary'e yaz
+      - name: Gate-1 Summary
+        if: always()
+        run: |
+          echo "## 🔒 Gate-1: Secret Scanning" >> $GITHUB_STEP_SUMMARY
+          echo "Tool: Gitleaks" >> $GITHUB_STEP_SUMMARY
+          echo "Result: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2 — SECURITY GATE #2 : DEPENDENCY CHECK
+  # ─────────────────────────────────────────────────────────────
+  dependency-check:
+    name: "🔒 Gate-2 · Dependency Audit"
+    runs-on: windows-latest
+    needs: secret-scan          # Gate-1 geçmeden başlamaz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # NuGet paketlerini geri yükle (dependency-check için gerekli)
+      - name: Restore NuGet packages
+        run: dotnet restore OpcServerSolution.sln
+
+      # OWASP Dependency-Check
+      # --failOnCVSS 7  → CVSS ≥ 7.0 bulunan bağımlılık varsa pipeline durur
+      # --enableRetired → Kullanımdan kalkmış bağımlılıkları da raporla
+      - name: OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        id: depcheck
+        with:
+          project: 'OpcServerSolution'
+          path: '.'
+          format: 'HTML,JSON'
+          out: 'dependency-check-report'
+          args: >
+            --failOnCVSS 7
+            --enableRetired
+            --suppression .github/dependency-check-suppressions.xml
+            --exclude "**/bin/**"
+            --exclude "**/obj/**"
+            --exclude "**/TestApp/**"
+
+      # Raporu artifact olarak kaydet (başarısızlıkta da sakla)
+      - name: Upload Dependency-Check Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: dependency-check-report/
+          retention-days: 30
+
+      - name: Gate-2 Summary
+        if: always()
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "## 🔒 Gate-2: Dependency Audit`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Tool: OWASP Dependency-Check`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Threshold: CVSS < 7.0`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Result: ${{ job.status }}`n"
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3 — BUILD + TEST + SECURITY GATE #3 : SAST / SONARCLOUD
+  # ─────────────────────────────────────────────────────────────
+  build-test-sast:
+    name: "⚙️ Build · Test · Gate-3 SAST"
+    runs-on: windows-latest
+    needs: dependency-check     # Gate-2 geçmeden başlamaz
+
+    steps:
+      - name: Checkout (full history — SonarCloud blame analizi için)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # SonarCloud scanner Java 17 gerektirir
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'zulu'
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # ── Cache: SonarCloud paketleri ──
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~\sonar\cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # ── Cache: SonarCloud scanner binary ──
+      - name: Cache SonarCloud scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\scanner
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarCloud scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        shell: powershell
+        run: |
+          New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
+          dotnet tool update dotnet-sonarscanner --tool-path ${{ runner.temp }}\scanner
+
+      # ── SonarCloud Başlat ──
+      - name: SonarCloud — Begin Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: powershell
+        run: |
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin `
+            /k:"DiLaRaSnTrK_opc-server-project" `
+            /o:"dilara-sntrk11" `
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" `
+            /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" `
+            /d:sonar.exclusions="**/UI/**,**/TestApp/**,**/OPC Server/**" `
+            /d:sonar.coverage.exclusions="**/UI/**,**/TestApp/**" `
+            /d:sonar.qualitygate.wait=true
+
+          # sonar.qualitygate.wait=true → Quality Gate sonucu bekler
+          # Gate FAIL → bu adım hata kodu döner → pipeline durur (Gate-3)
+
+      # ── Build ──
+      - name: dotnet restore
+        run: dotnet restore OpcServerSolution.sln
+
+      - name: dotnet build (Release)
+        run: dotnet build OpcServerSolution.sln --configuration Release --no-restore
+
+      # ── Test + Coverage ──
+      # Coverlet ile OpenCover formatında coverage raporu üretir
+      # threshold: coverage %60'ın altına düşerse step başarısız olur
+      - name: dotnet test + Coverage
+        run: |
+          dotnet test OpcServerSolution.sln `
+            --no-build `
+            --configuration Release `
+            --verbosity normal `
+            --collect:"XPlat Code Coverage;Format=opencover" `
+            --results-directory TestResults/ `
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Threshold=60 `
+               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ThresholdType=line `
+               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ThresholdStat=total
+        shell: powershell
+
+      # Test sonuçlarını artifact olarak kaydet
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/
+          retention-days: 30
+
+      # ── SonarCloud Bitir — Gate-3 ──
+      - name: SonarCloud — End Analysis (Gate-3)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: powershell
+        run: |
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner end `
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          # Quality Gate = Failed → pipeline burada durur
+
+      - name: Gate-3 Summary
+        if: always()
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "## 🔒 Gate-3: SAST / SonarCloud`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Quality Gate: sonar.qualitygate.wait=true`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Coverage threshold: 60%`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Result: ${{ job.status }}`n"
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 4 — PIPELINE ÖZET (her durumda çalışır)
+  # ─────────────────────────────────────────────────────────────
+  pipeline-summary:
+    name: "📋 Pipeline Özet"
+    runs-on: ubuntu-latest
+    needs: [secret-scan, dependency-check, build-test-sast]
+    if: always()
+
+    steps:
+      - name: Tüm Gate Sonuçları
+        run: |
+          echo "## DevSecOps Pipeline Sonucu" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Gate | Araç | Sonuç |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔒 Gate-1 Secret Scan | Gitleaks | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔒 Gate-2 Dep Audit   | OWASP DC | ${{ needs.dependency-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔒 Gate-3 SAST        | SonarCloud | ${{ needs.build-test-sast.result }} |" >> $GITHUB_STEP_SUMMARY
