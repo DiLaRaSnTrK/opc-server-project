@@ -79,7 +79,7 @@ jobs:
 
       # Artifact'ı GitHub'a yükle
       - name: Upload Release Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: opc-server-release-${{ github.sha }}
           path: publish/OpcServer/
