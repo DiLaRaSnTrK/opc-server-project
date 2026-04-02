@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Net.Sockets;
 using Core.Interfaces;
 using Core.Models;
 using EasyModbus;
@@ -10,103 +8,114 @@ namespace Core.Protocols
     public class ModbusClientWrapper : IProtocolClient, IDisposable
     {
         private readonly Device _device;
-        private readonly ModbusClient _client;
+        private ModbusClient _client;
         private bool _disposed;
 
-        public bool IsConnected => _client?.Connected ?? false;
+        private readonly SemaphoreSlim _lock = new(1, 1);
+
+        private bool _isConnected;
+
+        public bool IsConnected => _isConnected;
 
         public event EventHandler<DataReceivedEventArgs> DataReceived;
 
         public ModbusClientWrapper(Device device)
         {
             _device = device ?? throw new ArgumentNullException(nameof(device));
-            _client = new ModbusClient(device.IPAddress, device.Port);
+            _client = CreateNewClient();
+        }
+
+        private ModbusClient CreateNewClient()
+        {
+            return new ModbusClient(_device.IPAddress, _device.Port)
+            {
+                UnitIdentifier = _device.SlaveId,
+                ConnectionTimeout = 3000
+            };
         }
 
         public async Task ConnectAsync(CancellationToken ct = default)
         {
+            await _lock.WaitAsync(ct);
+            try
+            {
+                await ConnectInternalAsync(ct);
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
+        private async Task ConnectInternalAsync(CancellationToken ct)
+        {
+            if (_isConnected) return;
+
             await Task.Run(() =>
             {
+
+                ForceReplaceClient();
+
                 try
                 {
-                    if (!_client.Connected)
-                    {
-                        _client.UnitIdentifier = _device.SlaveId;
-                        _client.Connect();
-                    }
+                    _client.Connect();
+                    _isConnected = true;
                 }
                 catch (Exception ex)
                 {
-                    throw new InvalidOperationException($"Modbus bağlantısı başarısız: {ex.Message}", ex);
+                    _isConnected = false;
+                    throw new InvalidOperationException(
+                        $"Modbus bağlantısı başarısız [{_device.IPAddress}:{_device.Port}]: {ex.Message}", ex);
                 }
             }, ct);
         }
 
         public async Task DisconnectAsync()
         {
-            await Task.Run(() =>
+            await _lock.WaitAsync();
+            try
             {
-                try
-                {
-                    if (_client.Connected)
-                        _client.Disconnect();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Bağlantı kapatılırken hata: {ex.Message}");
-                }
-            });
+                ForceReplaceClient();
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
 
-        // src/Core/Protocols/ModbusClient.cs içine
+        private void ForceReplaceClient()
+        {
+            _isConnected = false;
+            try { _client.Disconnect(); } catch { }
+
+
+            _client = CreateNewClient();
+        }
+
 
         public async Task<ReadResult> ReadTagAsync(Tag tag, CancellationToken ct = default)
         {
-            if (tag == null) return new ReadResult { Success = false, ErrorMessage = "Tag null" };
+            if (tag == null)
+                return new ReadResult { Success = false, ErrorMessage = "Tag null" };
 
-            // Maksimum 2 deneme yapacağız (İlk deneme + 1 Retry)
-            int maxRetries = 2;
+            const int maxAttempts = 3;
             string lastError = "";
 
-            for (int i = 0; i < maxRetries; i++)
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
+
+                if (ct.IsCancellationRequested)
+                    return new ReadResult { Success = false, ErrorMessage = "İptal edildi" };
+
+                await _lock.WaitAsync(ct);
                 try
                 {
-                    // Bağlı değilsek bağlan
-                    if (!IsConnected)
-                        await ConnectAsync(ct);
 
-                    int address = tag.Address;
-                    int quantity = GetRegisterCount(tag.DataType);
-                    double value = 0;
+                    if (!_isConnected)
+                        await ConnectInternalAsync(ct);
 
-                    await Task.Run(() =>
-                    {
-                        // Modbus kütüphanesi bazen bağlı sansa bile kopmuş olabilir.
-                        // Okuma yaparken hata alırsak catch bloğuna düşeceğiz.
-                        switch (tag.RegisterType)
-                        {
-                            case "HoldingRegister":
-                                var hr = _client.ReadHoldingRegisters(address, quantity);
-                                value = ConvertRegisters(hr, tag.DataType);
-                                break;
+                    double value = await Task.Run(() => ExecuteRead(tag), ct);
 
-                            case "InputRegister":
-                                var ir = _client.ReadInputRegisters(address, quantity);
-                                value = ConvertRegisters(ir, tag.DataType);
-                                break;
-
-                            case "Coil":
-                                value = _client.ReadCoils(address, 1)[0] ? 1 : 0;
-                                break;
-
-                            case "DiscreteInput":
-                                value = _client.ReadDiscreteInputs(address, 1)[0] ? 1 : 0;
-                                break;
-                        }
-                    }, ct);
-
-                    // Başarılıysa event fırlat ve sonucu dön
                     DataReceived?.Invoke(this, new DataReceivedEventArgs
                     {
                         TagId = tag.TagId,
@@ -116,118 +125,135 @@ namespace Core.Protocols
 
                     return new ReadResult { Success = true, Values = new[] { value } };
                 }
+                catch (Exception ex) when (IsConnectionError(ex))
+                {
+
+                    lastError = ex.Message;
+                    ForceReplaceClient();
+
+
+                }
                 catch (Exception ex)
                 {
-                    lastError = ex.Message;
 
-                    // Eğer hata IO veya Socket hatasıysa bağlantı kopmuş demektir.
-                    // Bağlantıyı tamamen kapatıp bir sonraki turda (i+1) sıfırdan bağlanmasını sağlayalım.
-                    await DisconnectAsync();
+                    return new ReadResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"Okuma hatası (deneme {attempt}): {ex.Message}"
+                    };
+                }
+                finally
+                {
+                    _lock.Release();
+                }
 
-                    // Döngü devam edecek ve "ConnectAsync" tekrar çağrılacak.
+                if (attempt < maxAttempts)
+                {
+                    int delayMs = attempt * 500;   // 500ms, 1000ms
+                    await Task.Delay(delayMs, ct).ConfigureAwait(false);
                 }
             }
 
-            // Döngü bitti ve hala başarılı olamadıysak
-            return new ReadResult { Success = false, ErrorMessage = $"Okuma başarısız: {lastError}" };
-        }
-
-        // Kaç register okunacağını belirler
-        private int GetRegisterCount(TagDataType dt)
-        {
-            return dt switch
+            return new ReadResult
             {
-                TagDataType.Bool => 1,
-                TagDataType.Int16 => 1,
-                TagDataType.UInt16 => 1,
-                TagDataType.Float => 2,
-                TagDataType.Int32 => 2,
-                TagDataType.UInt32 => 2,
-                TagDataType.Double => 4,
-                _ => 1
+                Success = false,
+                ErrorMessage = $"Maksimum deneme ({maxAttempts}) aşıldı. Son hata: {lastError}"
             };
         }
 
-        // TÜM TIPLER İÇİN DOĞRU DÖNÜŞÜM
-        private double ConvertRegisters(int[] r, TagDataType type)
+        private double ExecuteRead(Tag tag)
         {
-            if (r == null || r.Length == 0)
-                return 0;
+            int address = tag.Address;
+            int quantity = GetRegisterCount(tag.DataType);
 
-            switch (type)
+            return tag.RegisterType switch
             {
-                case TagDataType.Bool:
-                    return r[0] == 1 ? 1 : 0;
+                "HoldingRegister" => ConvertRegisters(
+                    _client.ReadHoldingRegisters(address, quantity), tag.DataType),
 
-                case TagDataType.Int16:
-                    return (short)r[0];
+                "InputRegister" => ConvertRegisters(
+                    _client.ReadInputRegisters(address, quantity), tag.DataType),
 
-                case TagDataType.UInt16:
-                    return r[0];
+                "Coil" =>
+                    _client.ReadCoils(address, 1)[0] ? 1.0 : 0.0,
 
-                case TagDataType.Int32:
-                    return CombineToInt32(r[0], r[1]);
+                "DiscreteInput" =>
+                    _client.ReadDiscreteInputs(address, 1)[0] ? 1.0 : 0.0,
 
-                case TagDataType.UInt32:
-                    return (uint)CombineToInt32(r[0], r[1]);
-
-                case TagDataType.Float:
-                    return CombineToFloat(r[0], r[1]);
-
-                case TagDataType.Double:
-                    return CombineToDouble(r);
-
-                default:
-                    return r[0];
-            }
-        }
-
-        // 2 Register → Float
-        private float CombineToFloat(int reg1, int reg2)
-        {
-            byte[] bytes =
-            {
-                (byte)(reg1 >> 8),
-                (byte)(reg1 & 0xFF),
-                (byte)(reg2 >> 8),
-                (byte)(reg2 & 0xFF)
+                _ => throw new NotSupportedException(
+                    $"Desteklenmeyen register tipi: {tag.RegisterType}")
             };
-
-            return BitConverter.ToSingle(bytes, 0);
         }
 
-        // 2 Register → INT32
-        private int CombineToInt32(int reg1, int reg2)
+        private static bool IsConnectionError(Exception ex)
         {
-            return (reg1 << 16) | (reg2 & 0xFFFF);
+            return ex is IOException
+                or SocketException
+                or TimeoutException
+                or InvalidOperationException { InnerException: IOException or SocketException };
         }
 
-        // 4 Register → DOUBLE
-        private double CombineToDouble(int[] r)
+        private static int GetRegisterCount(TagDataType dt) => dt switch
         {
-            byte[] bytes =
+            TagDataType.Bool => 1,
+            TagDataType.Int16 => 1,
+            TagDataType.UInt16 => 1,
+            TagDataType.Float => 2,
+            TagDataType.Int32 => 2,
+            TagDataType.UInt32 => 2,
+            TagDataType.Double => 4,
+            _ => 1
+        };
+
+        private static double ConvertRegisters(int[] r, TagDataType type)
+        {
+            if (r is null || r.Length == 0) return 0;
+
+            return type switch
+            {
+                TagDataType.Bool => r[0] != 0 ? 1.0 : 0.0,
+                TagDataType.Int16 => (short)r[0],
+                TagDataType.UInt16 => (ushort)r[0],
+                TagDataType.Int32 => CombineToInt32(r[0], r[1]),
+                TagDataType.UInt32 => (uint)CombineToInt32(r[0], r[1]),
+                TagDataType.Float => CombineToFloat(r[0], r[1]),
+                TagDataType.Double => CombineToDouble(r),
+                _ => r[0]
+            };
+        }
+
+        private static float CombineToFloat(int r0, int r1)
+        {
+            byte[] b =
+            {
+                (byte)(r0 >> 8), (byte)(r0 & 0xFF),
+                (byte)(r1 >> 8), (byte)(r1 & 0xFF)
+            };
+            return BitConverter.ToSingle(b, 0);
+        }
+
+        private static int CombineToInt32(int r0, int r1)
+            => (r0 << 16) | (r1 & 0xFFFF);
+
+        private static double CombineToDouble(int[] r)
+        {
+            byte[] b =
             {
                 (byte)(r[0] >> 8), (byte)(r[0] & 0xFF),
                 (byte)(r[1] >> 8), (byte)(r[1] & 0xFF),
                 (byte)(r[2] >> 8), (byte)(r[2] & 0xFF),
                 (byte)(r[3] >> 8), (byte)(r[3] & 0xFF)
             };
-
-            return BitConverter.ToDouble(bytes, 0);
+            return BitConverter.ToDouble(b, 0);
         }
 
         public void Dispose()
         {
             if (_disposed) return;
-
-            try
-            {
-                if (_client.Connected)
-                    _client.Disconnect();
-            }
-            catch { }
-
             _disposed = true;
+
+            try { _client.Disconnect(); } catch { }
+            _lock.Dispose();
             GC.SuppressFinalize(this);
         }
     }

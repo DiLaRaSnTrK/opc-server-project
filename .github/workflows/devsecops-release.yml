@@ -1,0 +1,95 @@
+# ============================================================
+#  DevSecOps Release Pipeline
+#  OPC Sunucu Projesi — Aşama 6
+#
+#  Tetikleyici: YALNIZCA main branch'e push (merge) olduğunda
+#  Amaç: Release artifact üretmek + son güvenlik doğrulaması
+# ============================================================
+
+name: DevSecOps Release
+
+on:
+  push:
+    branches:
+      - main
+
+# main'e aynı anda tek release çalışsın
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # Release iptal edilmez
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1 — SON GÜVENLİK DOĞRULAMASI
+  # ─────────────────────────────────────────────────────────────
+  pre-release-security:
+    name: "🔒 Pre-Release Security Check"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # CI pipeline'dan bağımsız ikinci bir secret taraması
+      - name: Gitleaks Final Check
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2 — RELEASE BUILD (net9.0-windows, Release config)
+  # ─────────────────────────────────────────────────────────────
+  release-build:
+    name: "📦 Release Build & Artifact"
+    runs-on: windows-latest
+    needs: pre-release-security
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore OpcServerSolution.sln
+
+      - name: Build Release
+        run: |
+          dotnet build OpcServerSolution.sln `
+            --configuration Release `
+            --no-restore `
+            -p:TreatWarningsAsErrors=false
+        shell: powershell
+
+      # UI projesini publish et (WinForms exe)
+      - name: Publish UI (self-contained)
+        run: |
+          dotnet publish src/UI/UI.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained false `
+            --output publish/OpcServer `
+            --no-build
+        shell: powershell
+
+      # Artifact'ı GitHub'a yükle
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opc-server-release-${{ github.sha }}
+          path: publish/OpcServer/
+          retention-days: 90
+
+      # Release özeti
+      - name: Release Summary
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "## 📦 Release Build Tamamlandı`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Commit: ${{ github.sha }}`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Branch: ${{ github.ref_name }}`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Artifact: opc-server-release-${{ github.sha }}`n"

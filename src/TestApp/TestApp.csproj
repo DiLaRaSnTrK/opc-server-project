@@ -14,9 +14,6 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.2" />
-    <PackageReference Include="NModbus" Version="3.0.81" />
-    <PackageReference Include="NModbus.Serial" Version="3.0.81" />
-    <PackageReference Include="NModbus4" Version="2.1.0" />
   </ItemGroup>
 
   <ItemGroup>

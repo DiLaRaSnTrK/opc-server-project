@@ -1,6 +1,39 @@
+# ============================================================
+#  Dependabot Konfigürasyonu — Aşama 6 (Düzeltilmiş)
+#
+#  Değişiklikler:
+#  - github-actions ekosistemi eklendi
+#  - NModbus/NModbus4/NModbus.Serial KALDIRILDI (artık projede yok)
+#  - EasyModbusTCP aktif kullanımda — güncellemeler takip ediliyor
+# ============================================================
+
 version: 2
+
 updates:
+  # ── NuGet bağımlılık güncellemeleri ──────────────────────────
   - package-ecosystem: "nuget"
-    directory: "/" # Solution kökü
+    directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "nuget"
+    # NOT: NModbus/NModbus4/NModbus.Serial artık projeden kaldırıldı.
+    # Ignore listesi temizlendi — tüm kalan paketler takip ediliyor.
+
+  # ── GitHub Actions bağımlılık güncellemeleri ─────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"

@@ -482,3 +482,36 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# ============================================================
+# Aşama 6 — Güvenlik Ekleri
+# ============================================================
+
+# SQLite veritabanı dosyaları (system.db repoya girmemeli)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# OPC UA sertifika ve anahtar dosyaları
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+# pfx zaten vardı — OPC UA sertifika dizinleri
+CertificateStores/
+pki/
+
+# Yerel/geliştirici konfigürasyon dosyaları
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+local.settings.json
+
+# Pipeline çıktıları (artifact olarak saklanır, repoya girmez)
+dependency-check-report/
+TestResults/
+publish/
