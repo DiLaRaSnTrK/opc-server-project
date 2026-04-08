@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check Suppression Dosyası
+  OPC Sunucu Projesi — Aşama 6
+
+  Amaç: Bilinen false positive CVE bulgularını bastırmak.
+
+  KULLANIM KURALI:
+  - Her suppression bir <notes> açıklaması içermeli (neden bastırıldı?)
+  - Bitiş tarihi (until) mutlaka belirtilmeli
+  - Takım onayı olmadan ekleme yapılmamalı
+
+  MEVCUT DURUM: Başlangıçta boş — false positive tespit edildikçe doldurulacak.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+  <!--
+  ÖRNEK SUPPRESSION ŞABLONU (kullanmak için yorumu kaldır):
+
+  <suppress>
+    <notes>
+      [YYYY-MM-DD] CVE-XXXX-YYYY: Bu CVE EasyModbusTCP v5.6.0 için false positive.
+      Güvenlik açığı v5.4.x'i etkiliyor, kullandığımız v5.6.0 yamalı.
+      Referans: https://github.com/rossmann-engineering/EasyModbusTCP/security/advisories/...
+      Onaylayan: [isim]
+    </notes>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-XXXX-YYYY</cve>
+  </suppress>
+  -->
+
+</suppressions>

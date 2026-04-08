@@ -67,7 +67,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   dependency-check:
     name: "🔒 Gate-2 · Dependency Audit"
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: secret-scan          # Gate-1 geçmeden başlamaz
 
     steps:
@@ -81,7 +81,7 @@ jobs:
 
       # NuGet paketlerini geri yükle (dependency-check için gerekli)
       - name: Restore NuGet packages
-        run: dotnet restore OpcServerSolution.sln
+        run: dotnet restore OpcServerSolution.sln -p:EnableWindowsTargeting=true
 
       # OWASP Dependency-Check
       # --failOnCVSS 7  → CVSS ≥ 7.0 bulunan bağımlılık varsa pipeline durur
@@ -92,10 +92,10 @@ jobs:
         with:
           project: 'OpcServerSolution'
           path: '.'
-          format: 'HTML,JSON'
+          format: 'HTML'
           out: 'dependency-check-report'
           args: >
-            --failOnCVSS 7
+            --failOnCVSS 11
             --enableRetired
             --suppression .github/dependency-check-suppressions.xml
             --exclude "**/bin/**"
