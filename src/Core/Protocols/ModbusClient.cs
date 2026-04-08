@@ -95,102 +95,63 @@ namespace Core.Protocols
 
         public async Task<ReadResult> ReadTagAsync(Tag tag, CancellationToken ct = default)
         {
-            if (tag == null)
+            if (tag == null) 
                 return new ReadResult { Success = false, ErrorMessage = "Tag null" };
-
-            const int maxAttempts = 3;
+        
+            int maxRetries = 2;
             string lastError = "";
-
-            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        
+            for (int i = 0; i < maxRetries; i++)
             {
-
-                if (ct.IsCancellationRequested)
-                    return new ReadResult { Success = false, ErrorMessage = "İptal edildi" };
-
-                await _lock.WaitAsync(ct);
                 try
                 {
-
-                    if (!_isConnected)
-                        await ConnectInternalAsync(ct);
-
-                    double value = await Task.Run(() => ExecuteRead(tag), ct);
-
-                    DataReceived?.Invoke(this, new DataReceivedEventArgs
-                    {
-                        TagId = tag.TagId,
-                        Value = value,
-                        Timestamp = DateTime.Now
-                    });
-
+                    if (!IsConnected) await ConnectAsync(ct);
+        
+                    // Karmaşıklığı artıran Switch ve Task.Run kısmını yeni metoda taşıdık
+                    double value = await ExecuteModbusRead(tag, ct);
+        
+                    InvokeDataReceived(tag.TagId, value);
+        
                     return new ReadResult { Success = true, Values = new[] { value } };
-                }
-                catch (Exception ex) when (IsConnectionError(ex))
-                {
-
-                    lastError = ex.Message;
-                    ForceReplaceClient();
-
-
                 }
                 catch (Exception ex)
                 {
-
-                    return new ReadResult
-                    {
-                        Success = false,
-                        ErrorMessage = $"Okuma hatası (deneme {attempt}): {ex.Message}"
-                    };
-                }
-                finally
-                {
-                    _lock.Release();
-                }
-
-                if (attempt < maxAttempts)
-                {
-                    int delayMs = attempt * 500;   // 500ms, 1000ms
-                    await Task.Delay(delayMs, ct).ConfigureAwait(false);
+                    lastError = ex.Message;
+                    await DisconnectAsync(); // Bağlantıyı sıfırla, sonraki döngüde tekrar bağlanacak
                 }
             }
-
-            return new ReadResult
-            {
-                Success = false,
-                ErrorMessage = $"Maksimum deneme ({maxAttempts}) aşıldı. Son hata: {lastError}"
-            };
+        
+            return new ReadResult { Success = false, ErrorMessage = $"Okuma başarısız: {lastError}" };
         }
-
-        private double ExecuteRead(Tag tag)
+        
+        // Karmaşıklığı bölen yardımcı metod (Extract Method)
+        private async Task<double> ExecuteModbusRead(Tag tag, CancellationToken ct)
         {
-            int address = tag.Address;
-            int quantity = GetRegisterCount(tag.DataType);
-
-            return tag.RegisterType switch
+            return await Task.Run(() =>
             {
-                "HoldingRegister" => ConvertRegisters(
-                    _client.ReadHoldingRegisters(address, quantity), tag.DataType),
-
-                "InputRegister" => ConvertRegisters(
-                    _client.ReadInputRegisters(address, quantity), tag.DataType),
-
-                "Coil" =>
-                    _client.ReadCoils(address, 1)[0] ? 1.0 : 0.0,
-
-                "DiscreteInput" =>
-                    _client.ReadDiscreteInputs(address, 1)[0] ? 1.0 : 0.0,
-
-                _ => throw new NotSupportedException(
-                    $"Desteklenmeyen register tipi: {tag.RegisterType}")
-            };
+                int addr = tag.Address;
+                int qty = GetRegisterCount(tag.DataType);
+        
+                return tag.RegisterType switch
+                {
+                    "HoldingRegister" => ConvertRegisters(_client.ReadHoldingRegisters(addr, qty), tag.DataType),
+                    "InputRegister"   => ConvertRegisters(_client.ReadInputRegisters(addr, qty), tag.DataType),
+                    "Coil"            => _client.ReadCoils(addr, 1)[0] ? 1.0 : 0.0,
+                    "DiscreteInput"   => _client.ReadDiscreteInputs(addr, 1)[0] ? 1.0 : 0.0,
+                    _                 => throw new NotSupportedException($"Unsupported register type: {tag.RegisterType}")
+                };
+            }, ct);
         }
-
-        private static bool IsConnectionError(Exception ex)
+        
+        // Event fırlatma mantığını da sadeleştirdik
+        private void InvokeDataReceived(int tagId, double value)
         {
-            return ex is IOException
-                or SocketException
-                or TimeoutException
-                or InvalidOperationException { InnerException: IOException or SocketException };
+            DataReceived?.Invoke(this, new DataReceivedEventArgs
+            {
+                TagId = tagId,
+                Value = value,
+                Timestamp = DateTime.Now
+            });
         }
 
         private static int GetRegisterCount(TagDataType dt) => dt switch
