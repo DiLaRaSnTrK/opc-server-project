@@ -13,23 +13,41 @@ namespace Core.Helpers
     {
         /// <summary>
         /// Ham double değeri belirtilen veri tipine çevirir.
+        /// Her dal açıkça (object) olarak döndürülür — switch expression
+        /// kullanılmaz çünkü derleyici tüm dalları ortak türe (double) yükseltir.
         /// </summary>
         /// <param name="dataType">Hedef veri tipi.</param>
         /// <param name="rawValue">Ham değer.</param>
-        /// <returns>Dönüştürülmüş değer.</returns>
+        /// <returns>Doğru C# türünde kutulanmış değer.</returns>
         public static object Convert(TagDataType dataType, double rawValue)
         {
-            return dataType switch
+            switch (dataType)
             {
-                TagDataType.Bool => Math.Abs(rawValue - 1) < 0.00001 ? 1 : 0,
-                TagDataType.Int16 => (short)rawValue,
-                TagDataType.UInt16 => (ushort)rawValue,
-                TagDataType.Int32 => (int)rawValue,
-                TagDataType.UInt32 => (uint)rawValue,
-                TagDataType.Float => (float)rawValue,
-                TagDataType.Double => rawValue,
-                _ => rawValue,
-            };
+                case TagDataType.Bool:
+                    // 1.0'a 0.00001'den yakınsa true(1), değilse false(0)
+                    return Math.Abs(rawValue - 1) < 0.00001 ? (object)(int)1 : (object)(int)0;
+
+                case TagDataType.Int16:
+                    return (object)(short)rawValue;
+
+                case TagDataType.UInt16:
+                    return (object)(ushort)rawValue;
+
+                case TagDataType.Int32:
+                    return (object)(int)rawValue;
+
+                case TagDataType.UInt32:
+                    return (object)(uint)rawValue;
+
+                case TagDataType.Float:
+                    return (object)(float)rawValue;
+
+                case TagDataType.Double:
+                    return (object)rawValue;
+
+                default:
+                    return (object)rawValue;
+            }
         }
     }
 }
