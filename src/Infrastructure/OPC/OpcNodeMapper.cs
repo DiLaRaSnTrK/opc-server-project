@@ -1,7 +1,10 @@
-﻿using Core.Models;
+﻿// <copyright file="OpcNodeMapper.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace Infrastructure.OPC
 {
+    using Core.Models;
     public class OpcNodeMapper
     {
         public void CreateNodes(List<Channel> channels)

@@ -28,5 +28,41 @@
     <cve>CVE-XXXX-YYYY</cve>
   </suppress>
   -->
-
+  <suppress>
+    <notes>
+      EasyModbusTCP için false positive — CVE'ler TCP protokolünün
+      kendisiyle ilgili (2004-2005), EasyModbus kütüphanesiyle değil.
+      CPE eşleşmesi: cpe:2.3:a:tcp:tcp — bu EasyModbus değil.
+    </notes>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2005-0065</cve>
+  </suppress>
+  <suppress>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2005-3675</cve>
+  </suppress>
+  <suppress>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2004-1060</cve>
+  </suppress>
+  <suppress>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2004-0790</cve>
+  </suppress>
+  <suppress>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2004-0791</cve>
+  </suppress>
+  <suppress>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2005-0066</cve>
+  </suppress>
+  <suppress>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2005-0067</cve>
+  </suppress>
+  <suppress>
+    <packageUrl regex="true">^pkg:nuget/EasyModbusTCP@.*$</packageUrl>
+    <cve>CVE-2005-0068</cve>
+  </suppress>
 </suppressions>

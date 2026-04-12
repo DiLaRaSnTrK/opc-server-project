@@ -1,11 +1,14 @@
-﻿using Core.Helpers;
-using Core.Interfaces;
-using Core.Models;
-using Microsoft.Data.Sqlite;
-
+﻿// <copyright file="DatabaseService.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace Core.Database
 {
+
+    using Core.Helpers;
+    using Core.Interfaces;
+    using Core.Models;
+    using Microsoft.Data.Sqlite;
     public class DatabaseService : IDisposable
     {
         private readonly string _dbPath;
@@ -62,7 +65,6 @@ namespace Core.Database
             cmd.ExecuteNonQuery();
         }
 
-        #region Channels
         public int AddChannel(Channel channel)
         {
             using var con = new SqliteConnection($"Data Source={_dbPath}");
@@ -96,9 +98,7 @@ namespace Core.Database
             }
             return list;
         }
-        #endregion
 
-        #region Devices
         public int AddDevice(Device device)
         {
             using var con = new SqliteConnection($"Data Source={_dbPath}");
@@ -140,9 +140,7 @@ namespace Core.Database
             }
             return list;
         }
-        #endregion
 
-        #region Tags
         public int AddTag(Tag tag)
         {
             using var con = new SqliteConnection($"Data Source={_dbPath}");
@@ -213,7 +211,6 @@ namespace Core.Database
             _tagUpdater?.UpdateTag(tag.Name, dbValue);
         }
 
-        #endregion
         /*public void InsertHistory(int tagId, double value, DateTime ts)
         {
             using var con = new SqliteConnection($"Data Source={_dbPath}");
@@ -264,12 +261,12 @@ namespace Core.Database
             using var cmd = con.CreateCommand();
             // Belirli tarih aralığı
             cmd.CommandText = @"
-        SELECT Timestamp, Value 
-        FROM TagHistory 
-        WHERE TagId=@id 
-          AND Timestamp >= @start 
-          AND Timestamp <= @end 
-        ORDER BY Timestamp ASC";
+            SELECT Timestamp, Value 
+            FROM TagHistory 
+            WHERE TagId=@id 
+              AND Timestamp >= @start 
+              AND Timestamp <= @end 
+            ORDER BY Timestamp ASC";
 
             cmd.Parameters.AddWithValue("@id", tagId);
             cmd.Parameters.AddWithValue("@start", startDate.ToString("o"));
@@ -286,10 +283,21 @@ namespace Core.Database
             return list;
         }
 
+        private bool disposed = false;
 
         public void Dispose()
         {
-            // nothing to dispose currently
+            Dispose(true);
+            GC.SuppressFinalize(this); // bu satır şart
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                if (disposing) { /* managed kaynakları temizle */ }
+                disposed = true;
+            }
         }
 
         private object ConvertTagValue(Tag tag)
@@ -350,8 +358,6 @@ namespace Core.Database
             cmd.ExecuteNonQuery();
         }
 
-        #region Update Methods
-
         public void UpdateChannel(Channel ch)
         {
             using var con = new SqliteConnection($"Data Source={_dbPath}");
@@ -397,7 +403,6 @@ namespace Core.Database
             cmd.ExecuteNonQuery();
         }
 
-        #endregion
     }
 
 }

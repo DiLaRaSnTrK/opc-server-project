@@ -1,17 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using Core.Database;
+﻿using Core.Database;
 using Core.Models;
 using LiveCharts;
-using LiveCharts.Definitions.Charts;
-using LiveCharts.WinForms;
 using LiveCharts.Wpf; // bazı özellikler için
 
 namespace UI.Forms

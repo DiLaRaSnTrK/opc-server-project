@@ -1,8 +1,10 @@
-﻿using System.Threading.Tasks;
-using Core.Models;
+﻿// <copyright file="IProtocol.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace Core.Interfaces
 {
+    using Core.Models;
     public interface IProtocol
     {
         /// <summary>

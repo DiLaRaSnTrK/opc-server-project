@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// <copyright file="Tag.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace Core.Models
 {
@@ -32,7 +30,7 @@ namespace Core.Models
         public Device Device { get; set; }
     }
 
-public enum TagDataType
+    public enum TagDataType
     {
         Bool = 0,
         Int16 = 1,

@@ -18,5 +18,5 @@ static class Program
         }
 
         Application.Run(new Main());
-    }    
+    }
 }

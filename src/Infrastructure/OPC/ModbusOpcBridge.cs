@@ -1,9 +1,12 @@
-﻿using Core.Database;
-using Core.Models;
-using Core.Protocols;
+﻿// <copyright file="ModbusOpcBridge.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace Infrastructure.OPC
 {
+    using Core.Database;
+    using Core.Models;
+    using Core.Protocols;
     public class ModbusOpcBridge
     {
         private readonly DatabaseService _db;

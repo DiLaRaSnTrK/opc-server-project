@@ -1,9 +1,12 @@
-﻿using Core.Models;
-using Opc.Ua;
-using Opc.Ua.Server;
+﻿// <copyright file="CustomNodeManager.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace Infrastructure.OPC
 {
+    using Core.Models;
+    using Opc.Ua;
+    using Opc.Ua.Server;
     public class CustomNodeManager : CustomNodeManager2
     {
         private readonly Dictionary<string, BaseDataVariableState> _tags = new();

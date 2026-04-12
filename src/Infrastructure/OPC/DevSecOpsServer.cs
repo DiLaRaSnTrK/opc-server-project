@@ -1,9 +1,12 @@
-﻿using Core.Models;
-using Opc.Ua;
-using Opc.Ua.Server;
+﻿// <copyright file="DevSecOpsServer.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace Infrastructure.OPC
 {
+    using Core.Models;
+    using Opc.Ua;
+    using Opc.Ua.Server;
     public class DevSecOpsServer : StandardServer
     {
         public CustomNodeManager NodeManager { get; private set; }

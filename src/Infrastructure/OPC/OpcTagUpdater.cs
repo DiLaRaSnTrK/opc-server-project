@@ -1,8 +1,11 @@
-﻿using Core.Interfaces;
-using Core.Models;
-
+﻿// <copyright file="OpcTagUpdater.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 namespace Infrastructure.OPC
 {
+    using Core.Interfaces;
+    using Core.Models;
+
     public class OpcTagUpdater : ITagUpdater
     {
         private CustomNodeManager _nodeManager;
