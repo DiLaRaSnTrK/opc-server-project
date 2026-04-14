@@ -1,6 +1,4 @@
-﻿// <copyright file="ModbusOpcBridge.cs" company="OPC Server Project">
-// Copyright (c) OPC Server Project. All rights reserved.
-// </copyright>
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Infrastructure.OPC
 {
@@ -33,6 +31,7 @@ namespace Infrastructure.OPC
         /// <summary>Polling döngüsünü başlatır.</summary>
         public void Start()
         {
+            this.Stop();
             this.cts = new CancellationTokenSource();
             _ = Task.Run(() => this.PollLoop(this.cts.Token));
             Console.WriteLine($"[Bridge] {this.device.Name} başladı.");
@@ -41,8 +40,17 @@ namespace Infrastructure.OPC
         /// <summary>Polling döngüsünü durdurur.</summary>
         public void Stop()
         {
-            this.cts?.Cancel();
-            _ = this.modbusClient.DisconnectAsync();
+            if (this.cts != null)
+            {
+                this.cts.Cancel();
+                this.cts.Dispose();
+                this.cts = null;
+            }
+
+            if (this.modbusClient != null)
+            {
+                _ = this.modbusClient.DisconnectAsync();
+            }
         }
 
         private async Task PollLoop(CancellationToken token)

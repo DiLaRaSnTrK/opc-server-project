@@ -1,6 +1,4 @@
-﻿// <copyright file="DatabaseService.cs" company="OPC Server Project">
-// Copyright (c) OPC Server Project. All rights reserved.
-// </copyright>
+﻿// Copyright (c) PlaceholderCompany. All rights reserved.
 
 namespace Core.Database
 {

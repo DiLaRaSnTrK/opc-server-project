@@ -1,6 +1,4 @@
-﻿// <copyright file="CustomNodeManager.cs" company="OPC Server Project">
-// Copyright (c) OPC Server Project. All rights reserved.
-// </copyright>
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 using Core.Models;
 using Opc.Ua;

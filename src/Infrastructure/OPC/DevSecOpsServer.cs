@@ -1,6 +1,4 @@
-﻿// <copyright file="DevSecOpsServer.cs" company="OPC Server Project">
-// Copyright (c) OPC Server Project. All rights reserved.
-// </copyright>
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Infrastructure.OPC
 {

@@ -1,6 +1,4 @@
-﻿// <copyright file="ModbusClient.cs" company="OPC Server Project">
-// Copyright (c) OPC Server Project. All rights reserved.
-// </copyright>
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Core.Protocols
 {

@@ -1,6 +1,4 @@
-﻿// <copyright file="OpcServerService.cs" company="OPC Server Project">
-// Copyright (c) OPC Server Project. All rights reserved.
-// </copyright>
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Infrastructure.OPC
 {
@@ -132,7 +130,10 @@ namespace Infrastructure.OPC
             this.server = new DevSecOpsServer(allTags);
             await application.StartAsync(this.server);
 
-            this.opcTagUpdater.SetNodeManager(this.server.NodeManager!);
+            if (this.server.NodeManager != null)
+            {
+                this.opcTagUpdater.SetNodeManager(this.server.NodeManager);
+            }
 
             this.logger.LogInformation(
                 "[OPC] Sunucu başlatıldı: opc.tcp://localhost:4840 | Mod: SignAndEncrypt | AutoAccept: false | MinKeySize: 2048");
