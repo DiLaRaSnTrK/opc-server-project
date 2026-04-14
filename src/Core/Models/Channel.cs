@@ -1,5 +1,5 @@
-﻿// <copyright file="Channel.cs" company="PlaceholderCompany">
-// Copyright (c) PlaceholderCompany. All rights reserved.
+﻿// <copyright file="Channel.cs" company="OPC Server Project">
+// Copyright (c) OPC Server Project. All rights reserved.
 // </copyright>
 
 namespace Core.Models

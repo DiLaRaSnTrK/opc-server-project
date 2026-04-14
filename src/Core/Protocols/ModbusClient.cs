@@ -1,134 +1,139 @@
-﻿// <copyright file="ModbusClient.cs" company="PlaceholderCompany">
-// Copyright (c) PlaceholderCompany. All rights reserved.
+﻿// <copyright file="ModbusClient.cs" company="OPC Server Project">
+// Copyright (c) OPC Server Project. All rights reserved.
 // </copyright>
 
 namespace Core.Protocols
 {
+    using System;
+    using System.Collections.Generic;
     using System.Net;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Core.Interfaces;
     using Core.Models;
     using EasyModbus;
     using Microsoft.Extensions.Logging;
+
     /// <summary>
     /// EasyModbus istemci sarmalayıcı.
     /// Aşama 7 güvenlik iyileştirmeleri:
-    ///   - IP whitelist doğrulaması (T-04, T-12)
-    ///   - Yapılandırılmış loglama: Console.WriteLine → ILogger (T-06)
-    ///   - Bağlantı timeout parametresi eklendi
-    ///   - Sessiz catch blokları kapatıldı — hatalar loglanıyor
+    ///   T-04/T-12 IP whitelist ve format doğrulaması
+    ///   T-06      Yapılandırılmış loglama (ILogger)
+    ///   T-04      Input validation (adres aralığı kontrolü)
     /// </summary>
     public class ModbusClientWrapper : IProtocolClient, IDisposable
     {
-        private readonly Device _device;
-        private readonly ModbusClient _client;
-        private readonly ILogger<ModbusClientWrapper> _logger;
-        private bool _disposed;
+        // IP whitelist — boşsa tüm IP'lere izin verilir (geliştirme modu)
+        // Üretimde konfigürasyondan doldurulmalıdır.
+        private static readonly HashSet<string> AllowedIpAddresses =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // ── IP WHİTELİST (T-04, T-12) ─────────────────────────────────────────
-        // Boş bırakılırsa whitelist devre dışı (geliştirme ortamı).
-        // Üretimde appsettings veya ortam değişkeninden doldurulmalı.
-        private static readonly HashSet<string> AllowedIpAddresses = new(StringComparer.OrdinalIgnoreCase)
+        private readonly Device device;
+        private readonly ModbusClient client;
+        private readonly ILogger<ModbusClientWrapper>? logger;
+        private bool disposed;
+
+        /// <summary>Initializes a new instance of the <see cref="ModbusClientWrapper"/> class.</summary>
+        public ModbusClientWrapper(Device device, ILogger<ModbusClientWrapper>? logger = null)
         {
-            // Örnek: "192.168.1.100", "10.0.0.50"
-            // Üretimde bu listeyi konfigürasyondan okuyun.
-        };
-
-        public bool IsConnected => _client?.Connected ?? false;
-
-        public event EventHandler<DataReceivedEventArgs> DataReceived;
-
-        public ModbusClientWrapper(Device device, ILogger<ModbusClientWrapper> logger = null)
-        {
-            _device = device ?? throw new ArgumentNullException(nameof(device));
-            _logger = logger;
-            _client = new ModbusClient(device.IPAddress, device.Port)
+            this.device = device ?? throw new ArgumentNullException(nameof(device));
+            this.logger = logger;
+            this.client = new ModbusClient(device.IPAddress, device.Port)
             {
-                // ── BAĞLANTI TIMEOUT ──────────────────────────────────────────
-                // Önceki: Varsayılan (sonsuz bekleme riski)
-                // Şimdi: 3 saniye — yanıtsız PLC pipeline'ı bloklamaz
-                ConnectionTimeout = 3000
+                ConnectionTimeout = 3000,
             };
         }
 
+        /// <inheritdoc/>
+        public event EventHandler<DataReceivedEventArgs>? DataReceived;
+
+        /// <summary>Bağlantı durumunu döndürür.</summary>
+        public bool IsConnected => this.client?.Connected ?? false;
+
+        /// <inheritdoc/>
         public async Task ConnectAsync(CancellationToken ct = default)
         {
-            // ── IP WHİTELİST KONTROLÜ (T-04, T-12) ───────────────────────────
-            // Whitelist doluysa yalnızca listede olan IP'lere bağlan
             if (AllowedIpAddresses.Count > 0 &&
-                !AllowedIpAddresses.Contains(_device.IPAddress))
+                !AllowedIpAddresses.Contains(this.device.IPAddress))
             {
-                var msg = $"[MODBUS] Bağlantı reddedildi: {_device.IPAddress} whitelist dışında.";
-                _logger?.LogWarning(msg);
+                var msg = $"[MODBUS] Bağlantı reddedildi: {this.device.IPAddress} whitelist dışında.";
+                this.logger?.LogWarning("{Message}", msg);
                 throw new UnauthorizedAccessException(msg);
             }
 
-            // IP format doğrulaması
-            if (!IPAddress.TryParse(_device.IPAddress, out _))
+            if (!IPAddress.TryParse(this.device.IPAddress, out _))
             {
-                var msg = $"[MODBUS] Geçersiz IP adresi: '{_device.IPAddress}'";
-                _logger?.LogError(msg);
+                var msg = $"[MODBUS] Geçersiz IP adresi: '{this.device.IPAddress}'";
+                this.logger?.LogError("{Message}", msg);
                 throw new ArgumentException(msg);
             }
 
-            await Task.Run(() =>
-            {
-                try
+            await Task.Run(
+                () =>
                 {
-                    if (!_client.Connected)
+                    try
                     {
-                        _client.UnitIdentifier = _device.SlaveId;
-                        _client.Connect();
-                        _logger?.LogInformation(
-                            "[MODBUS] Bağlandı: {DeviceName} ({IP}:{Port})",
-                            _device.Name, _device.IPAddress, _device.Port);
+                        if (!this.client.Connected)
+                        {
+                            this.client.UnitIdentifier = this.device.SlaveId;
+                            this.client.Connect();
+                            this.logger?.LogInformation(
+                                "[MODBUS] Bağlandı: {DeviceName} ({IP}:{Port})",
+                                this.device.Name,
+                                this.device.IPAddress,
+                                this.device.Port);
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex,
-                        "[MODBUS] Bağlantı başarısız: {DeviceName} ({IP}:{Port})",
-                        _device.Name, _device.IPAddress, _device.Port);
-                    throw new InvalidOperationException(
-                        $"Modbus bağlantısı başarısız: {ex.Message}", ex);
-                }
-            }, ct);
+                    catch (Exception ex)
+                    {
+                        this.logger?.LogError(
+                            ex,
+                            "[MODBUS] Bağlantı başarısız: {DeviceName} ({IP}:{Port})",
+                            this.device.Name,
+                            this.device.IPAddress,
+                            this.device.Port);
+                        throw new InvalidOperationException($"Modbus bağlantısı başarısız: {ex.Message}", ex);
+                    }
+                },
+                ct);
         }
 
+        /// <inheritdoc/>
         public async Task DisconnectAsync()
         {
             await Task.Run(() =>
             {
                 try
                 {
-                    if (_client.Connected)
+                    if (this.client.Connected)
                     {
-                        _client.Disconnect();
-                        _logger?.LogInformation(
-                            "[MODBUS] Bağlantı kapatıldı: {DeviceName}", _device.Name);
+                        this.client.Disconnect();
+                        this.logger?.LogInformation(
+                            "[MODBUS] Bağlantı kapatıldı: {DeviceName}", this.device.Name);
                     }
                 }
                 catch (Exception ex)
                 {
-                    // ── SESSIZ CATCH KAPATILDI (T-06) ─────────────────────────
-                    // Önceki: Console.WriteLine (güvenlik olayları kayboluyordu)
-                    // Şimdi:  Warning olarak loglanıyor
-                    _logger?.LogWarning(ex,
-                        "[MODBUS] Bağlantı kapatılırken hata: {DeviceName}", _device.Name);
+                    this.logger?.LogWarning(
+                        ex, "[MODBUS] Bağlantı kapatılırken hata: {DeviceName}", this.device.Name);
                 }
             });
         }
 
+        /// <inheritdoc/>
         public async Task<ReadResult> ReadTagAsync(Tag tag, CancellationToken ct = default)
         {
             if (tag == null)
+            {
                 return new ReadResult { Success = false, ErrorMessage = "Tag null" };
+            }
 
-            // ── INPUT VALIDATION (T-04) ────────────────────────────────────────
             if (tag.Address < 0 || tag.Address > 65535)
             {
-                _logger?.LogWarning(
+                this.logger?.LogWarning(
                     "[MODBUS] Geçersiz adres: Tag={TagName} Address={Address}",
-                    tag.Name, tag.Address);
+                    tag.Name,
+                    tag.Address);
                 return new ReadResult { Success = false, ErrorMessage = "Geçersiz Modbus adresi" };
             }
 
@@ -139,72 +144,110 @@ namespace Core.Protocols
             {
                 try
                 {
-                    if (!IsConnected)
-                        await ConnectAsync(ct);
+                    if (!this.IsConnected)
+                    {
+                        await this.ConnectAsync(ct);
+                    }
 
                     int quantity = GetRegisterCount(tag.DataType);
                     double value = 0;
 
-                    await Task.Run(() =>
-                    {
-                        switch (tag.RegisterType)
+                    await Task.Run(
+                        () =>
                         {
-                            case "HoldingRegister":
-                                var hr = _client.ReadHoldingRegisters(tag.Address, quantity);
-                                value = ConvertRegisters(hr, tag.DataType);
-                                break;
-                            case "InputRegister":
-                                var ir = _client.ReadInputRegisters(tag.Address, quantity);
-                                value = ConvertRegisters(ir, tag.DataType);
-                                break;
-                            case "Coil":
-                                value = _client.ReadCoils(tag.Address, 1)[0] ? 1 : 0;
-                                break;
-                            case "DiscreteInput":
-                                value = _client.ReadDiscreteInputs(tag.Address, 1)[0] ? 1 : 0;
-                                break;
-                            default:
-                                throw new NotSupportedException(
-                                    $"Desteklenmeyen register tipi: {tag.RegisterType}");
-                        }
-                    }, ct);
+                            switch (tag.RegisterType)
+                            {
+                                case "HoldingRegister":
+                                    var hr = this.client.ReadHoldingRegisters(tag.Address, quantity);
+                                    value = ConvertRegisters(hr, tag.DataType);
+                                    break;
 
-                    DataReceived?.Invoke(this, new DataReceivedEventArgs
-                    {
-                        TagId = tag.TagId,
-                        Value = value,
-                        Timestamp = DateTime.Now
-                    });
+                                case "InputRegister":
+                                    var ir = this.client.ReadInputRegisters(tag.Address, quantity);
+                                    value = ConvertRegisters(ir, tag.DataType);
+                                    break;
+
+                                case "Coil":
+                                    value = this.client.ReadCoils(tag.Address, 1)[0] ? 1 : 0;
+                                    break;
+
+                                case "DiscreteInput":
+                                    value = this.client.ReadDiscreteInputs(tag.Address, 1)[0] ? 1 : 0;
+                                    break;
+
+                                default:
+                                    throw new NotSupportedException(
+                                        $"Desteklenmeyen register tipi: {tag.RegisterType}");
+                            }
+                        },
+                        ct);
+
+                    this.DataReceived?.Invoke(
+                        this,
+                        new DataReceivedEventArgs
+                        {
+                            TagId = tag.TagId,
+                            Value = value,
+                            Timestamp = DateTime.Now,
+                        });
 
                     return new ReadResult { Success = true, Values = new[] { value } };
                 }
                 catch (Exception ex)
                 {
                     lastError = ex.Message;
-
-                    // ── RETRY LOGLAMA (T-06) ───────────────────────────────────
-                    _logger?.LogWarning(
-                        "[MODBUS] Okuma hatası (deneme {Attempt}/{Max}): " +
-                        "Tag={TagName} | Hata={Error}",
-                        i + 1, maxRetries, tag.Name, ex.Message);
-
-                    await DisconnectAsync();
+                    this.logger?.LogWarning(
+                        "[MODBUS] Okuma hatası (deneme {Attempt}/{Max}): Tag={TagName}",
+                        i + 1,
+                        maxRetries,
+                        tag.Name);
+                    await this.DisconnectAsync();
                 }
             }
 
-            _logger?.LogError(
-                "[MODBUS] Tag okunamadı (tüm denemeler tükendi): " +
-                "Tag={TagName} | SonHata={Error}",
-                tag.Name, lastError);
+            this.logger?.LogError(
+                "[MODBUS] Tag okunamadı: Tag={TagName} | SonHata={Error}",
+                tag.Name,
+                lastError);
 
             return new ReadResult
             {
                 Success = false,
-                ErrorMessage = $"Okuma başarısız ({maxRetries} deneme): {lastError}"
+                ErrorMessage = $"Okuma başarısız ({maxRetries} deneme): {lastError}",
             };
         }
 
-        private int GetRegisterCount(TagDataType dt) => dt switch
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            this.Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>Kaynakları serbest bırakır.</summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (this.disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                if (this.client.Connected)
+                {
+                    this.client.Disconnect();
+                }
+            }
+            catch
+            {
+                // Dispose sırasında hata yutulur
+            }
+
+            this.disposed = true;
+        }
+
+        private static int GetRegisterCount(TagDataType dt) => dt switch
         {
             TagDataType.Bool => 1,
             TagDataType.Int16 => 1,
@@ -213,12 +256,16 @@ namespace Core.Protocols
             TagDataType.Int32 => 2,
             TagDataType.UInt32 => 2,
             TagDataType.Double => 4,
-            _ => 1
+            _ => 1,
         };
 
-        private double ConvertRegisters(int[] r, TagDataType type)
+        private static double ConvertRegisters(int[] r, TagDataType type)
         {
-            if (r == null || r.Length == 0) return 0;
+            if (r == null || r.Length == 0)
+            {
+                return 0;
+            }
+
             return type switch
             {
                 TagDataType.Bool => r[0] == 1 ? 1 : 0,
@@ -228,42 +275,32 @@ namespace Core.Protocols
                 TagDataType.UInt32 => (uint)CombineToInt32(r[0], r[1]),
                 TagDataType.Float => CombineToFloat(r[0], r[1]),
                 TagDataType.Double => CombineToDouble(r),
-                _ => r[0]
+                _ => r[0],
             };
         }
 
-        private float CombineToFloat(int r1, int r2)
+        private static float CombineToFloat(int r1, int r2)
         {
-            byte[] bytes = { (byte)(r1 >> 8), (byte)(r1 & 0xFF),
-                             (byte)(r2 >> 8), (byte)(r2 & 0xFF) };
+            byte[] bytes =
+            {
+                (byte)(r1 >> 8), (byte)(r1 & 0xFF),
+                (byte)(r2 >> 8), (byte)(r2 & 0xFF),
+            };
             return BitConverter.ToSingle(bytes, 0);
         }
 
-        private int CombineToInt32(int r1, int r2) => (r1 << 16) | (r2 & 0xFFFF);
+        private static int CombineToInt32(int r1, int r2) => (r1 << 16) | (r2 & 0xFFFF);
 
-        private double CombineToDouble(int[] r)
+        private static double CombineToDouble(int[] r)
         {
             byte[] bytes =
             {
                 (byte)(r[0] >> 8), (byte)(r[0] & 0xFF),
                 (byte)(r[1] >> 8), (byte)(r[1] & 0xFF),
                 (byte)(r[2] >> 8), (byte)(r[2] & 0xFF),
-                (byte)(r[3] >> 8), (byte)(r[3] & 0xFF)
+                (byte)(r[3] >> 8), (byte)(r[3] & 0xFF),
             };
             return BitConverter.ToDouble(bytes, 0);
-        }
-
-        public void Dispose()
-        {
-            if (_disposed) return;
-            try
-            {
-                if (_client.Connected)
-                    _client.Disconnect();
-            }
-            catch { }
-            _disposed = true;
-            GC.SuppressFinalize(this);
         }
     }
 }

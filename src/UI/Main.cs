@@ -594,7 +594,7 @@ namespace UI
             {
                 timer1.Stop();
 
-                _opcServer?.Stop();
+                _opcServer?.StopAsync().GetAwaiter().GetResult();
 
                 foreach (var client in _deviceConnections.Values)
                 {

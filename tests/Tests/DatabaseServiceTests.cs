@@ -351,6 +351,8 @@ namespace Tests
                     // Temizlik hatası testi patlatmasın
                 }
             }
+
+            GC.SuppressFinalize(this);
         }
 
         // ── YARDIMCI METOTLAR ────────────────────────────────────────────────

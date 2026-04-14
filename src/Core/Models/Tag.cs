@@ -1,5 +1,5 @@
-﻿// <copyright file="Tag.cs" company="PlaceholderCompany">
-// Copyright (c) PlaceholderCompany. All rights reserved.
+﻿// <copyright file="Tag.cs" company="OPC Server Project">
+// Copyright (c) OPC Server Project. All rights reserved.
 // </copyright>
 
 namespace Core.Models

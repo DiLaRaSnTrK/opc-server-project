@@ -4,9 +4,9 @@
 
 namespace Core.Interfaces
 {
-    /// <summary>
-    /// Modbus okuma işleminin sonucunu taşır.
-    /// </summary>
+    using System;
+
+    /// <summary>Modbus okuma işleminin sonucunu taşır.</summary>
     public class ReadResult
     {
         /// <summary>Okuma başarılı mı?</summary>

@@ -1,27 +1,34 @@
-﻿// <copyright file="DevSecOpsServer.cs" company="PlaceholderCompany">
-// Copyright (c) PlaceholderCompany. All rights reserved.
+﻿// <copyright file="DevSecOpsServer.cs" company="OPC Server Project">
+// Copyright (c) OPC Server Project. All rights reserved.
 // </copyright>
 
 namespace Infrastructure.OPC
 {
+    using System.Collections.Generic;
     using Core.Models;
     using Opc.Ua;
     using Opc.Ua.Server;
+
+    /// <summary>OPC UA sunucu ana sınıfı.</summary>
     public class DevSecOpsServer : StandardServer
     {
-        public CustomNodeManager NodeManager { get; private set; }
-        private readonly List<Tag> _tags;
+        private readonly List<Tag> tags;
 
+        /// <summary>Initializes a new instance of the <see cref="DevSecOpsServer"/> class.</summary>
         public DevSecOpsServer(List<Tag> tags)
         {
-            _tags = tags;
+            this.tags = tags;
         }
 
+        /// <summary>Node manager örneği.</summary>
+        public CustomNodeManager? NodeManager { get; private set; }
+
+        /// <inheritdoc/>
         protected override MasterNodeManager CreateMasterNodeManager(
             IServerInternal server, ApplicationConfiguration configuration)
         {
-            NodeManager = new CustomNodeManager(server, configuration, _tags);
-            return new MasterNodeManager(server, configuration, null, NodeManager);
+            this.NodeManager = new CustomNodeManager(server, configuration, this.tags);
+            return new MasterNodeManager(server, configuration, null, this.NodeManager);
         }
     }
 }

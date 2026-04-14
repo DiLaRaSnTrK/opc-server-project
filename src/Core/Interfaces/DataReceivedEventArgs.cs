@@ -4,12 +4,12 @@
 
 namespace Core.Interfaces
 {
-    /// <summary>
-    /// Modbus verisi alındığında tetiklenen event argümanları.
-    /// </summary>
+    using System;
+
+    /// <summary>Modbus verisi alındığında tetiklenen event argümanları.</summary>
     public class DataReceivedEventArgs : EventArgs
     {
-        /// <summary>Güncellenen tag'in ID'si.</summary>
+        /// <summary>Güncellenen tag ID'si.</summary>
         public int TagId { get; set; }
 
         /// <summary>Okunan değer.</summary>

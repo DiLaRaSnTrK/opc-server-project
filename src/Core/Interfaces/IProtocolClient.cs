@@ -4,13 +4,12 @@
 
 namespace Core.Interfaces
 {
+    using System;
     using System.Threading;
     using System.Threading.Tasks;
     using Core.Models;
 
-    /// <summary>
-    /// Protokol istemcileri için okuma/bağlantı arayüzü.
-    /// </summary>
+    /// <summary>Protokol istemcileri için okuma/bağlantı arayüzü.</summary>
     public interface IProtocolClient : IDisposable
     {
         /// <summary>Veri alındığında tetiklenir.</summary>
