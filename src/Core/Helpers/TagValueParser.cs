@@ -23,7 +23,7 @@ namespace Core.Helpers
             {
                 case TagDataType.Bool:
                     // 1.0'a 0.00001'den yakınsa true(1), değilse false(0)
-                    return Math.Abs(rawValue - 1) < 0.00001 ? (object)(int)1 : (object)(int)0;
+                    return Math.Abs(rawValue - 1) < 0.00001 ? (object)1 : (object)0;
 
                 case TagDataType.Int16:
                     return (object)(short)rawValue;

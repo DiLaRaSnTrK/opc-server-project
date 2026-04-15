@@ -14,10 +14,10 @@ namespace Infrastructure.OPC
         public CustomNodeManager(
             IServerInternal server,
             ApplicationConfiguration config,
-            List<Tag> tagDefinitions)
+            List<Tag> tags)
             : base(server, config, "http://devsecops.opc.server/")
         {
-            tagDefinitions = tagDefinitions;
+            this.tagDefinitions = tags ?? new List<Tag>();
         }
 
         public override void CreateAddressSpace(
@@ -38,7 +38,7 @@ namespace Infrastructure.OPC
                         TagDataType.Double => (object)0.0,
                         TagDataType.Int16 => (object)(short)0,
                         TagDataType.UInt16 => (object)(ushort)0,
-                        TagDataType.Int32 => (object)(int)0,
+                        TagDataType.Int32 => (object)0,
                         TagDataType.UInt32 => (object)(uint)0,
                         _ => (object)0
                     };
@@ -100,7 +100,7 @@ namespace Infrastructure.OPC
                     TagDataType.Double => (object)0.0,
                     TagDataType.Int16 => (object)(short)0,
                     TagDataType.UInt16 => (object)(ushort)0,
-                    TagDataType.Int32 => (object)(int)0,
+                    TagDataType.Int32 => (object)0,
                     TagDataType.UInt32 => (object)(uint)0,
                     _ => (object)0
                 };

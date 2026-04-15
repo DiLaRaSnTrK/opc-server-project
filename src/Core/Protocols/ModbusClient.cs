@@ -194,11 +194,14 @@ namespace Core.Protocols
                 catch (Exception ex)
                 {
                     lastError = ex.Message;
+
                     this.logger?.LogWarning(
+                        ex,
                         "[MODBUS] Okuma hatası (deneme {Attempt}/{Max}): Tag={TagName}",
                         i + 1,
                         maxRetries,
                         tag.Name);
+
                     await this.DisconnectAsync();
                 }
             }

@@ -10,7 +10,7 @@ namespace Infrastructure.OPC
     public class OpcNodeMapper
     {
         /// <summary>Kanal hiyerarşisinden node'lar oluşturur.</summary>
-        public void CreateNodes(List<Channel> channels)
+        public static void CreateNodes(List<Channel> channels)
         {
             foreach (var channel in channels)
             {

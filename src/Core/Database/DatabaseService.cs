@@ -19,8 +19,8 @@ namespace Core.Database
         /// <summary>Initializes a new instance of the <see cref="DatabaseService"/> class.</summary>
         public DatabaseService(string dbPath = "system.db", ITagUpdater tagUpdater = null)
         {
-            this.dbPath = dbPath;
-            this.tagUpdater = tagUpdater;
+            this.dbPath = dbPath ?? throw new ArgumentNullException(nameof(dbPath));
+            this.tagUpdater = tagUpdater ?? throw new ArgumentNullException(nameof(tagUpdater));
             this.Initialize();
         }
 
@@ -36,7 +36,7 @@ namespace Core.Database
             cmd.Parameters.AddWithValue("@n", channel.Name);
             cmd.Parameters.AddWithValue("@p", (int)channel.Protocol);
             cmd.Parameters.AddWithValue("@d", channel.Description ?? string.Empty);
-            return (int)(long)cmd.ExecuteScalar();
+            return (int)((long?)cmd.ExecuteScalar() ?? 0);
         }
 
         /// <summary>Tüm kanalları döndürür.</summary>
@@ -103,7 +103,7 @@ namespace Core.Database
             cmd.Parameters.AddWithValue("@port", device.Port);
             cmd.Parameters.AddWithValue("@slave", device.SlaveId);
             cmd.Parameters.AddWithValue("@desc", device.Description ?? string.Empty);
-            return (int)(long)cmd.ExecuteScalar();
+            return (int)((long?)cmd.ExecuteScalar() ?? 0);
         }
 
         /// <summary>Kanala ait cihazları döndürür.</summary>
@@ -179,7 +179,7 @@ namespace Core.Database
             cmd.Parameters.AddWithValue("@desc", tag.Description ?? string.Empty);
             cmd.Parameters.AddWithValue("@lv", ConvertTagValue(tag));
             cmd.Parameters.AddWithValue("@lu", tag.LastUpdated?.ToString("o") ?? (object)DBNull.Value);
-            return (int)(long)cmd.ExecuteScalar();
+            return (int)((long?)cmd.ExecuteScalar() ?? 0);
         }
 
         /// <summary>Cihaza ait tag'leri döndürür.</summary>
@@ -316,6 +316,13 @@ namespace Core.Database
         /// <summary>Kaynakları serbest bırakır.</summary>
         protected virtual void Dispose(bool disposing)
         {
+            if (this.disposed)
+            {
+                return;
+            }
+
+            if (disposing) { }
+
             this.disposed = true;
         }
 

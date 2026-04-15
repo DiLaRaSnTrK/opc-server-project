@@ -58,14 +58,14 @@ namespace Tests
         [InlineData("999.999.999.999")]
         [InlineData("abc.def.ghi.jkl")]
         [InlineData("")]
-        public async void ConnectAsync_InvalidIpFormat_ShouldThrow_ArgumentException(string ip)
+        public async Task ConnectAsync_InvalidIpFormat_ShouldThrow_ArgumentException(string ip)
         {
             var client = new ModbusClientWrapper(MakeDevice(ip), NullLogger<ModbusClientWrapper>.Instance);
             await Assert.ThrowsAsync<ArgumentException>(() => client.ConnectAsync());
         }
 
         [Fact]
-        public async void ConnectAsync_WhitelistActive_UnknownIp_ShouldThrow_UnauthorizedAccess()
+        public async Task ConnectAsync_WhitelistActive_UnknownIp_ShouldThrow_UnauthorizedAccess()
         {
             SetWhitelist(new[] { "10.0.0.1" });
             try

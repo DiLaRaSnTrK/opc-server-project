@@ -1,4 +1,6 @@
-﻿// Copyright (c) PlaceholderCompany. All rights reserved.
+﻿// <copyright file="ITagUpdater.cs" company="OPC Server Project">
+// Copyright (c) OPC Server Project. All rights reserved.
+// </copyright>
 
 namespace Core.Interfaces
 {

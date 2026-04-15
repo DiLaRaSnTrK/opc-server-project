@@ -1,4 +1,6 @@
-﻿// Copyright (c) OPC Server Project. All rights reserved.
+﻿// <copyright file="ModbusTagMapping.cs" company="OPC Server Project">
+// Copyright (c) OPC Server Project. All rights reserved.
+// </copyright>
 
 namespace Core.Models
 {
