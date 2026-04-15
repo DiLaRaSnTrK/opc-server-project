@@ -20,7 +20,7 @@ namespace Core.Database
         public DatabaseService(string dbPath = "system.db", ITagUpdater tagUpdater = null)
         {
             this.dbPath = dbPath ?? throw new ArgumentNullException(nameof(dbPath));
-            this.tagUpdater = tagUpdater ?? throw new ArgumentNullException(nameof(tagUpdater));
+            this.tagUpdater = tagUpdater;
             this.Initialize();
         }
 
