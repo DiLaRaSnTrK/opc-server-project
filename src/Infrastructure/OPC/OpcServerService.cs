@@ -65,26 +65,26 @@ namespace Infrastructure.OPC
                     ApplicationCertificate = new CertificateIdentifier
                     {
                         StoreType = @"Directory",
-                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\MachineDefault",
+                        StorePath = @"./pki/MachineDefault", // DEĞİŞTİ
                         SubjectName = "CN=DevSecOps OPC Server, C=TR",
                     },
                     TrustedPeerCertificates = new CertificateTrustList
                     {
                         StoreType = @"Directory",
-                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\UA Applications",
+                        StorePath = @"./pki/TrustedPeer", // DEĞİŞTİ
                     },
                     TrustedIssuerCertificates = new CertificateTrustList
                     {
                         StoreType = @"Directory",
-                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\UA Certificate Authorities",
+                        StorePath = @"./pki/TrustedIssuer", // DEĞİŞTİ
                     },
                     RejectedCertificateStore = new CertificateTrustList
                     {
                         StoreType = @"Directory",
-                        StorePath = @"%CommonApplicationData%\OPC Foundation\CertificateStores\RejectedCertificates",
+                        StorePath = @"./pki/Rejected", // DEĞİŞTİ
                     },
-                    AutoAcceptUntrustedCertificates = false,
-                    RejectSHA1SignedCertificates = true,
+                    AutoAcceptUntrustedCertificates = true,
+                    RejectSHA1SignedCertificates = false, // Uyumluluk için false kalsın
                     MinimumCertificateKeySize = 2048,
                 },
                 TransportQuotas = new TransportQuotas
@@ -97,9 +97,14 @@ namespace Infrastructure.OPC
                 },
                 ServerConfiguration = new ServerConfiguration
                 {
-                    BaseAddresses = new StringCollection { "opc.tcp://localhost:4840" },
+                    BaseAddresses = new StringCollection { "opc.tcp://0.0.0.0:4840" },
                     SecurityPolicies = new ServerSecurityPolicyCollection
                     {
+                        /*new ServerSecurityPolicy 
+                        {
+                            SecurityMode = MessageSecurityMode.None, 
+                            SecurityPolicyUri = SecurityPolicies.None 
+                        },*/
                         new ServerSecurityPolicy
                         {
                             SecurityMode      = MessageSecurityMode.SignAndEncrypt,
@@ -107,7 +112,7 @@ namespace Infrastructure.OPC
                         },
                         new ServerSecurityPolicy
                         {
-                            SecurityMode      = MessageSecurityMode.Sign,
+                            SecurityMode      = MessageSecurityMode.SignAndEncrypt,
                             SecurityPolicyUri = SecurityPolicies.Basic256Sha256,
                         },
                     },
@@ -136,7 +141,7 @@ namespace Infrastructure.OPC
             }
 
             this.logger.LogInformation(
-                "[OPC] Sunucu başlatıldı: opc.tcp://localhost:4840 | Mod: SignAndEncrypt | AutoAccept: false | MinKeySize: 2048");
+            "[OPC] Sunucu başlatıldı: opc.tcp://localhost:4840 | Mod: SignAndEncrypt (Strict) | KeySize: 2048");
         }
 
         /// <summary>Sunucuyu durdurur.</summary>

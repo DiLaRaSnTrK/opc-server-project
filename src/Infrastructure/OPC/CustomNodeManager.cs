@@ -15,7 +15,7 @@ namespace Infrastructure.OPC
             IServerInternal server,
             ApplicationConfiguration config,
             List<Tag> tags)
-            : base(server, config, "http://devsecops.opc.server/")
+            : base(server, config, "https://devsecops.opc.server/")
         {
             this.tagDefinitions = tags ?? new List<Tag>();
         }
