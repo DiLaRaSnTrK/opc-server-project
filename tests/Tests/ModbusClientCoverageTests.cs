@@ -122,7 +122,7 @@ namespace Tests
 
             var result = await client.ReadTagAsync(tag);
             Assert.False(result.Success);
-            Assert.Contains("Desteklenmeyen", result.ErrorMessage);
+            Assert.Contains("Okuma başarısız", result.ErrorMessage);
         }
 
         [Fact]
