@@ -282,26 +282,27 @@ namespace Core.Protocols
 
         private static float CombineToFloat(int r1, int r2)
         {
-            byte[] bytes =
-            {
-                (byte)(r1 >> 8), (byte)(r1 & 0xFF),
-                (byte)(r2 >> 8), (byte)(r2 & 0xFF),
-            };
-            return BitConverter.ToSingle(bytes, 0);
+            // Register'ları 16-bitlik parçalar halinde birleştirip byte dizisine çeviriyoruz
+            byte[] b1 = BitConverter.GetBytes((ushort)r1);
+            byte[] b2 = BitConverter.GetBytes((ushort)r2);
+
+            // Küçükten büyüğe (Little-Endian) sıralama: [b1_low, b1_high, b2_low, b2_high]
+            byte[] full = { b1[0], b1[1], b2[0], b2[1] };
+            return BitConverter.ToSingle(full, 0);
         }
 
         private static int CombineToInt32(int r1, int r2) => (r1 << 16) | (r2 & 0xFFFF);
 
         private static double CombineToDouble(int[] r)
         {
-            byte[] bytes =
+            byte[] full = new byte[8];
+            for (int i = 0; i < 4; i++)
             {
-                (byte)(r[0] >> 8), (byte)(r[0] & 0xFF),
-                (byte)(r[1] >> 8), (byte)(r[1] & 0xFF),
-                (byte)(r[2] >> 8), (byte)(r[2] & 0xFF),
-                (byte)(r[3] >> 8), (byte)(r[3] & 0xFF),
-            };
-            return BitConverter.ToDouble(bytes, 0);
+                byte[] part = BitConverter.GetBytes((ushort)r[i]);
+                full[i * 2] = part[0];
+                full[i * 2 + 1] = part[1];
+            }
+            return BitConverter.ToDouble(full, 0);
         }
     }
 }
