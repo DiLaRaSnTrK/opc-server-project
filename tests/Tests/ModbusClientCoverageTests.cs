@@ -9,6 +9,7 @@ namespace Tests
     using Core.Interfaces;
     using Core.Models;
     using Core.Protocols;
+    using Moq;
     using Xunit;
 
     public class ModbusClientCoverageTests
@@ -170,6 +171,29 @@ namespace Tests
             Assert.NotEmpty(r.ErrorMessage);
         }
 
+        [Fact]
+        public async Task ReadTagAsync_HoldingRegister_ShouldReturnMockedValue()
+        {
+            // 1. Mock nesnesini yarat
+            var mockClient = new Mock<IModbusClientAdapter>();
+
+            // 2. Taklit et: "Connected her zaman true dönsün"
+            mockClient.Setup(m => m.Connected).Returns(true);
+
+            // 3. Taklit et: "ReadHoldingRegisters çağrılırsa [10, 20] dönsün"
+            mockClient.Setup(m => m.ReadHoldingRegisters(It.IsAny<int>(), It.IsAny<int>()))
+                      .Returns(new int[] { 10, 20 });
+
+            var wrapper = new ModbusClientWrapper(MakeDevice(), mockClient.Object);
+            var tag = new Tag { RegisterType = "HoldingRegister", DataType = TagDataType.Int32, Address = 100 };
+
+            // 4. Çalıştır
+            var result = await wrapper.ReadTagAsync(tag);
+
+            // 5. Doğrula: switch bloğuna girdi mi?
+            Assert.True(result.Success);
+            mockClient.Verify(m => m.ReadHoldingRegisters(100, 2), Times.Once());
+        }
         // ── ConvertRegisters — INT32, UINT32, FLOAT, DOUBLE DALLARI ──────────
 
         [Fact]

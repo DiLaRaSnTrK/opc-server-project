@@ -9,7 +9,6 @@ namespace Core.Protocols
     using System.Threading.Tasks;
     using Core.Interfaces;
     using Core.Models;
-    using EasyModbus;
     using Microsoft.Extensions.Logging;
 
     /// <summary>
@@ -27,7 +26,7 @@ namespace Core.Protocols
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private readonly Device device;
-        private readonly ModbusClient client;
+        private readonly IModbusClientAdapter client;
         private readonly ILogger<ModbusClientWrapper>? logger;
         private bool disposed;
 
@@ -36,12 +35,15 @@ namespace Core.Protocols
         {
             this.device = device ?? throw new ArgumentNullException(nameof(device));
             this.logger = logger;
-            this.client = new ModbusClient(device.IPAddress, device.Port)
-            {
-                ConnectionTimeout = 3000,
-            };
+            this.client = new EasyModbusAdapter(device.IPAddress, device.Port);
         }
-
+        // Testler için kullanılacak özel constructor
+        public ModbusClientWrapper(Device device, IModbusClientAdapter client, ILogger<ModbusClientWrapper>? logger = null)
+        {
+            this.device = device;
+            this.client = client; // Buraya MOCK gelecek
+            this.logger = logger;
+        }
         /// <inheritdoc/>
         public event EventHandler<DataReceivedEventArgs>? DataReceived;
 
