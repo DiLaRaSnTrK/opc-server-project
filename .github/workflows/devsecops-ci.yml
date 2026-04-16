@@ -49,7 +49,7 @@ jobs:
       # GitHub native secret scanning (repo ayarlarından da aktif edilmeli)
       # Aşağıdaki action ek kural seti + PR annotation sağlar
       - name: Gitleaks — Secret & Credential Scan
-        uses: gitleaks/gitleaks-action@6e07675f0f353b3b42b1029286f03027b9116e10
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Pro lisans varsa
@@ -87,7 +87,7 @@ jobs:
       # --failOnCVSS 7  → CVSS ≥ 7.0 bulunan bağımlılık varsa pipeline durur
       # --enableRetired → Kullanımdan kalkmış bağımlılıkları da raporla
       - name: OWASP Dependency-Check
-        uses: dependency-check/Dependency-Check_Action@834645224e757c9641775797d39352e47e30324c
+        uses: dependency-check/Dependency-Check_Action@main
         id: depcheck
         with:
           project: 'OpcServerSolution'
