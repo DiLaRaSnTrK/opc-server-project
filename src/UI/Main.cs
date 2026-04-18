@@ -1,17 +1,22 @@
-﻿using Core.Database; // DatabaseService
-using Core.Models;
-using Core.Protocols;
-using Infrastructure.OPC;
-using UI.Forms;
+﻿// <copyright file="Main.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 
 namespace UI
 {
+    // Aşama 7 — Serilog yapılandırılmış loglama
+    using Core.Database;
+    using Core.Models;
+    using Core.Protocols;
+    using Infrastructure.OPC;
+    using Microsoft.Extensions.Logging;
+    using Serilog;
+    using UI.Forms;
     public partial class Main : Form
     {
         private List<Channel> channelsList;
         private DatabaseService db;
-
 
         private ContextMenuStrip menuConnectivity;
         private ContextMenuStrip menuChannel;
@@ -20,15 +25,36 @@ namespace UI
 
         private OpcTagUpdater _opcTagUpdater;
         private OpcServerService _opcServer;
+
+        // ── SERILOG LOGGER (T-06) ─────────────────────────────────────────────
+        private static readonly ILoggerFactory AppLoggerFactory = BuildLoggerFactory();
+
+        private static ILoggerFactory BuildLoggerFactory()
+        {
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Information()
+                .WriteTo.Console(
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+                .WriteTo.File(
+                    path: "logs/opc-server-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 30,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+
+            return Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
+                builder.AddSerilog(Log.Logger));
+        }
+
         public Main()
         {
             InitializeComponent();
-            db = new DatabaseService();
 
-            // OPC başlat
+            var opcLogger = AppLoggerFactory.CreateLogger<OpcServerService>();
+
             _opcTagUpdater = new OpcTagUpdater();
-            db = new DatabaseService("system.db", _opcTagUpdater); // ← tagUpdater'ı ver
-            _opcServer = new OpcServerService(_opcTagUpdater, db);
+            db = new DatabaseService("system.db", _opcTagUpdater);
+            _opcServer = new OpcServerService(_opcTagUpdater, db, opcLogger);
             _ = _opcServer.StartAsync(); // fire and forget
 
             CreateContextMenus();
@@ -568,7 +594,7 @@ namespace UI
             {
                 timer1.Stop();
 
-                _opcServer?.Stop();
+                _opcServer?.StopAsync().GetAwaiter().GetResult();
 
                 foreach (var client in _deviceConnections.Values)
                 {

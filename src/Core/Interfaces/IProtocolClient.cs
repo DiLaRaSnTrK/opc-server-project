@@ -1,32 +1,25 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Core.Models;
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Core.Interfaces
 {
-    public class ReadResult
-    {
-        public bool Success { get; set; }
-        public double[] Values { get; set; }
-        public string ErrorMessage { get; set; } // ✅ eklendi
-    }
+    using System;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using Core.Models;
 
-    public class DataReceivedEventArgs : EventArgs
-    {
-        public int TagId { get; set; }
-        public double Value { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
+    /// <summary>Protokol istemcileri için okuma/bağlantı arayüzü.</summary>
     public interface IProtocolClient : IDisposable
     {
-        Task ConnectAsync(CancellationToken ct = default);
-        Task DisconnectAsync();
-        Task<ReadResult> ReadTagAsync(Core.Models.Tag tag, CancellationToken ct = default);
-
+        /// <summary>Veri alındığında tetiklenir.</summary>
         event EventHandler<DataReceivedEventArgs> DataReceived;
+
+        /// <summary>Cihaza bağlanır.</summary>
+        Task ConnectAsync(CancellationToken ct = default);
+
+        /// <summary>Bağlantıyı kapatır.</summary>
+        Task DisconnectAsync();
+
+        /// <summary>Belirtilen tag'i okur.</summary>
+        Task<ReadResult> ReadTagAsync(Tag tag, CancellationToken ct = default);
     }
 }
-
-

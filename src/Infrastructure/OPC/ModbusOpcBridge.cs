@@ -1,58 +1,74 @@
-﻿using Core.Database;
-using Core.Models;
-using Core.Protocols;
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Infrastructure.OPC
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using Core.Database;
+    using Core.Models;
+    using Core.Protocols;
+
+    /// <summary>Modbus verilerini OPC UA node'larına aktaran köprü.</summary>
     public class ModbusOpcBridge
     {
-        private readonly DatabaseService _db;
-        private readonly Device _device;
-        private readonly List<Tag> _tags;
-        private readonly ModbusClientWrapper _modbusClient;
-        private CancellationTokenSource _cts;
+        private readonly DatabaseService db;
+        private readonly Device device;
+        private readonly List<Tag> tags;
+        private readonly ModbusClientWrapper modbusClient;
+        private CancellationTokenSource? cts;
 
+        /// <summary>Initializes a new instance of the <see cref="ModbusOpcBridge"/> class.</summary>
         public ModbusOpcBridge(DatabaseService db, Device device, List<Tag> tags)
         {
-            _db = db;
-            _device = device;
-            _tags = tags;
-            _modbusClient = new ModbusClientWrapper(device);
+            this.db = db;
+            this.device = device;
+            this.tags = tags;
+            this.modbusClient = new ModbusClientWrapper(device);
         }
 
+        /// <summary>Polling döngüsünü başlatır.</summary>
         public void Start()
         {
-            _cts = new CancellationTokenSource();
-            _ = Task.Run(() => PollLoop(_cts.Token));
-            Console.WriteLine($"[Bridge] {_device.Name} başladı.");
+            this.Stop();
+            this.cts = new CancellationTokenSource();
+            _ = Task.Run(() => this.PollLoop(this.cts.Token));
+            Console.WriteLine($"[Bridge] {this.device.Name} başladı.");
         }
 
+        /// <summary>Polling döngüsünü durdurur.</summary>
         public void Stop()
         {
-            _cts?.Cancel();
-            _ = _modbusClient.DisconnectAsync();
+            if (this.cts != null)
+            {
+                this.cts.Cancel();
+                this.cts.Dispose();
+                this.cts = null;
+            }
+
+            if (this.modbusClient != null)
+            {
+                _ = this.modbusClient.DisconnectAsync();
+            }
         }
 
         private async Task PollLoop(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
-                foreach (var tag in _tags)
+                foreach (var tag in this.tags)
                 {
-                    var result = await _modbusClient.ReadTagAsync(tag, token);
-
+                    var result = await this.modbusClient.ReadTagAsync(tag, token);
                     if (result.Success)
                     {
                         double value = result.Values[0];
-
-                        // ✅ DB güncelle + OPC'ye yaz (UpdateTagValue içinde _tagUpdater çağrılıyor)
-                        _db.UpdateTagValue(tag, value);
-
-                        Console.WriteLine($"[{_device.Name}] {tag.Name} = {value}");
+                        this.db.UpdateTagValue(tag, value);
+                        Console.WriteLine($"[{this.device.Name}] {tag.Name} = {value}");
                     }
                     else
                     {
-                        Console.WriteLine($"[{_device.Name}] {tag.Name} hata: {result.ErrorMessage}");
+                        Console.WriteLine($"[{this.device.Name}] {tag.Name} hata: {result.ErrorMessage}");
                     }
                 }
 

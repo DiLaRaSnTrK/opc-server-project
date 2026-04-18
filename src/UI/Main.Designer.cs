@@ -20,8 +20,6 @@ partial class Main
         base.Dispose(disposing);
     }
 
-    #region Windows Form Designer generated code
-
     /// <summary>
     ///  Required method for Designer support - do not modify
     ///  the contents of this method with the code editor.
@@ -208,8 +206,7 @@ partial class Main
         ResumeLayout(false);
     }
 
-    #endregion
-
+    
     private Panel panel1;
     private Button button1;
     private TreeView treeView1;

@@ -1,31 +1,37 @@
-﻿using Core.Interfaces;
-using Core.Models;
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Infrastructure.OPC
 {
+    using Core.Interfaces;
+    using Core.Models;
+
+    /// <summary>OPC UA node değerlerini güncelleyen köprü sınıf.</summary>
     public class OpcTagUpdater : ITagUpdater
     {
-        private CustomNodeManager _nodeManager;
+        private CustomNodeManager? nodeManager;
 
-        // Server başladıktan sonra NodeManager'ı buraya bağla
+        /// <summary>NodeManager'ı bağlar (sunucu başladıktan sonra çağrılır).</summary>
         public void SetNodeManager(CustomNodeManager nodeManager)
         {
-            _nodeManager = nodeManager;
+            this.nodeManager = nodeManager;
         }
 
+        /// <inheritdoc/>
         public void UpdateTag(string tagName, object value)
         {
-            _nodeManager?.UpdateTag(tagName, value);
+            this.nodeManager?.UpdateTag(tagName, value);
         }
 
+        /// <summary>Runtime'da yeni tag node'u ekler.</summary>
         public void AddTagNode(Tag tag)
         {
-            _nodeManager?.AddTagNode(tag);
+            this.nodeManager?.AddTagNode(tag);
         }
 
+        /// <summary>Tag node'unu kaldırır.</summary>
         public void RemoveTagNode(string tagName)
         {
-            _nodeManager?.RemoveTagNode(tagName);
+            this.nodeManager?.RemoveTagNode(tagName);
         }
     }
 }

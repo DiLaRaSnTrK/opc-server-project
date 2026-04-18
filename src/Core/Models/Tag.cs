@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Core.Models
 {
@@ -32,7 +28,7 @@ namespace Core.Models
         public Device Device { get; set; }
     }
 
-public enum TagDataType
+    public enum TagDataType
     {
         Bool = 0,
         Int16 = 1,

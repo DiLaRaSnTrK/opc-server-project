@@ -39,7 +39,8 @@ namespace ModbusTestApp
                 Console.WriteLine("[DB] Örnek veri eklendi.");
             }
 
-            var opcServer = new OpcServerService(opcTagUpdater, db);  // ← db'yi ver
+            var opcLogger = loggerFactory.CreateLogger<OpcServerService>();
+            var opcServer = new OpcServerService(opcTagUpdater, db, opcLogger);
 
             await opcServer.StartAsync();
 

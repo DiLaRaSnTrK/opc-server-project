@@ -1,4 +1,6 @@
-﻿using Core.Models;
+﻿// Copyright (c) OPC Server Project. All rights reserved.
+
+using Core.Models;
 using Opc.Ua;
 using Opc.Ua.Server;
 
@@ -6,16 +8,16 @@ namespace Infrastructure.OPC
 {
     public class CustomNodeManager : CustomNodeManager2
     {
-        private readonly Dictionary<string, BaseDataVariableState> _tags = new();
-        private readonly List<Tag> _tagDefinitions;
+        private readonly Dictionary<string, BaseDataVariableState> nodeTags = new();
+        private readonly List<Tag> tagDefinitions;
 
         public CustomNodeManager(
             IServerInternal server,
             ApplicationConfiguration config,
-            List<Tag> tagDefinitions)
-            : base(server, config, "http://devsecops.opc.server/")
+            List<Tag> tags)
+            : base(server, config, "https://devsecops.opc.server/")
         {
-            _tagDefinitions = tagDefinitions;
+            this.tagDefinitions = tags ?? new List<Tag>();
         }
 
         public override void CreateAddressSpace(
@@ -26,7 +28,7 @@ namespace Infrastructure.OPC
                 var root = CreateFolderNode(
                     "DevSecOpsData", "DevSecOps Tags", externalReferences);
 
-                foreach (var tag in _tagDefinitions)
+                foreach (var tag in tagDefinitions)
                 {
                     // DataType'a göre default değer belirle
                     object defaultValue = tag.DataType switch
@@ -36,7 +38,7 @@ namespace Infrastructure.OPC
                         TagDataType.Double => (object)0.0,
                         TagDataType.Int16 => (object)(short)0,
                         TagDataType.UInt16 => (object)(ushort)0,
-                        TagDataType.Int32 => (object)(int)0,
+                        TagDataType.Int32 => (object)0,
                         TagDataType.UInt32 => (object)(uint)0,
                         _ => (object)0
                     };
@@ -75,7 +77,7 @@ namespace Infrastructure.OPC
             lock (Lock)
             {
                 // Zaten varsa ekleme
-                if (_tags.ContainsKey(tag.Name))
+                if (nodeTags.ContainsKey(tag.Name))
                 {
                     Console.WriteLine($"[OPC] Node zaten var: {tag.Name}");
                     return;
@@ -83,7 +85,7 @@ namespace Infrastructure.OPC
 
                 // Root klasörü bul
                 var folderId = new NodeId("DevSecOpsData", NamespaceIndex);
-                var folder = FindPredefinedNode(folderId, typeof(FolderState)) as FolderState;
+                var folder = FindPredefinedNode<FolderState>(folderId);
 
                 if (folder == null)
                 {
@@ -98,7 +100,7 @@ namespace Infrastructure.OPC
                     TagDataType.Double => (object)0.0,
                     TagDataType.Int16 => (object)(short)0,
                     TagDataType.UInt16 => (object)(ushort)0,
-                    TagDataType.Int32 => (object)(int)0,
+                    TagDataType.Int32 => (object)0,
                     TagDataType.UInt32 => (object)(uint)0,
                     _ => (object)0
                 };
@@ -112,17 +114,17 @@ namespace Infrastructure.OPC
         {
             lock (Lock)
             {
-                if (!_tags.TryGetValue(tagName, out var variable))
+                if (!nodeTags.TryGetValue(tagName, out var variable))
                     return;
 
                 var folderId = new NodeId("DevSecOpsData", NamespaceIndex);
-                var folder = FindPredefinedNode(folderId, typeof(FolderState)) as FolderState;
+                var folder = FindPredefinedNode<FolderState>(folderId);
 
                 folder?.RemoveReference(ReferenceTypeIds.Organizes, false, variable.NodeId);
 
                 // ✅ Düzeltildi
                 RemovePredefinedNode(SystemContext, variable, new List<LocalReference>());
-                _tags.Remove(tagName);
+                nodeTags.Remove(tagName);
 
                 Console.WriteLine($"[OPC] Node silindi: {tagName}");
             }
@@ -150,12 +152,12 @@ namespace Infrastructure.OPC
             parent.AddReference(ReferenceTypeIds.Organizes, false, variable.NodeId);
 
             AddPredefinedNode(SystemContext, variable);
-            _tags[name] = variable;
+            nodeTags[name] = variable;
         }
 
         public void UpdateTag(string tagName, object value)
         {
-            if (_tags.TryGetValue(tagName, out var variable))
+            if (nodeTags.TryGetValue(tagName, out var variable))
             {
                 variable.Value = value;
                 variable.Timestamp = DateTime.UtcNow;

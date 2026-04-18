@@ -1,85 +1,49 @@
-﻿using Core.Helpers;
-using Core.Interfaces;
-using Core.Models;
-using Microsoft.Data.Sqlite;
-
+﻿// Copyright (c) PlaceholderCompany. All rights reserved.
 
 namespace Core.Database
 {
+    using System;
+    using System.Collections.Generic;
+    using Core.Helpers;
+    using Core.Interfaces;
+    using Core.Models;
+    using Microsoft.Data.Sqlite;
+
+    /// <summary>SQLite veritabanı işlemlerini yöneten servis.</summary>
     public class DatabaseService : IDisposable
     {
-        private readonly string _dbPath;
-        private readonly ITagUpdater _tagUpdater;
+        private readonly string dbPath;
+        private readonly ITagUpdater tagUpdater;
+        private bool disposed;
+
+        /// <summary>Initializes a new instance of the <see cref="DatabaseService"/> class.</summary>
         public DatabaseService(string dbPath = "system.db", ITagUpdater tagUpdater = null)
         {
-            _dbPath = dbPath;
-            _tagUpdater = tagUpdater;
-            Initialize();
+            this.dbPath = dbPath ?? throw new ArgumentNullException(nameof(dbPath));
+            this.tagUpdater = tagUpdater;
+            this.Initialize();
         }
 
-        private void Initialize()
-        {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
-            con.Open();
+        // ── CHANNELS ─────────────────────────────────────────────────────────
 
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS Channels (
-                ChannelId INTEGER PRIMARY KEY AUTOINCREMENT,
-                Name TEXT NOT NULL,
-                Protocol INTEGER NOT NULL,
-                Description TEXT
-            );
-            CREATE TABLE IF NOT EXISTS Devices (
-                DeviceId INTEGER PRIMARY KEY AUTOINCREMENT,
-                ChannelId INTEGER NOT NULL,
-                Name TEXT NOT NULL,
-                IPAddress TEXT,
-                Port INTEGER,
-                SlaveId INTEGER,
-                Description TEXT,
-                FOREIGN KEY(ChannelId) REFERENCES Channels(ChannelId) ON DELETE CASCADE
-            );
-            CREATE TABLE IF NOT EXISTS Tags (
-                TagId INTEGER PRIMARY KEY AUTOINCREMENT,
-                DeviceId INTEGER NOT NULL,
-                Name TEXT NOT NULL,
-                Address INTEGER,
-                RegisterType TEXT,
-                DataType INTEGER,
-                Description TEXT,
-                LastValue REAL,
-                LastUpdated TEXT,
-                FOREIGN KEY(DeviceId) REFERENCES Devices(DeviceId) ON DELETE CASCADE
-            );
-            CREATE TABLE IF NOT EXISTS TagHistory (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    TagId INTEGER,
-                    Value REAL,
-                    Timestamp TEXT
-            );
-            ";
-            cmd.ExecuteNonQuery();
-        }
-
-        #region Channels
+        /// <summary>Yeni kanal ekler.</summary>
         public int AddChannel(Channel channel)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
             cmd.CommandText = "INSERT INTO Channels (Name, Protocol, Description) VALUES (@n, @p, @d); SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@n", channel.Name);
             cmd.Parameters.AddWithValue("@p", (int)channel.Protocol);
-            cmd.Parameters.AddWithValue("@d", channel.Description ?? "");
-            var id = (long)cmd.ExecuteScalar();
-            return (int)id;
+            cmd.Parameters.AddWithValue("@d", channel.Description ?? string.Empty);
+            return (int)((long?)cmd.ExecuteScalar() ?? 0);
         }
 
+        /// <summary>Tüm kanalları döndürür.</summary>
         public List<Channel> GetChannels()
         {
             var list = new List<Channel>();
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
             cmd.CommandText = "SELECT ChannelId, Name, Protocol, Description FROM Channels";
@@ -91,35 +55,62 @@ namespace Core.Database
                     ChannelId = r.GetInt32(0),
                     Name = r.GetString(1),
                     Protocol = (ProtocolType)r.GetInt32(2),
-                    Description = r.IsDBNull(3) ? "" : r.GetString(3)
+                    Description = r.IsDBNull(3) ? string.Empty : r.GetString(3),
                 });
             }
+
             return list;
         }
-        #endregion
 
-        #region Devices
-        public int AddDevice(Device device)
+        /// <summary>Kanalı günceller.</summary>
+        public void UpdateChannel(Channel ch)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
-            cmd.CommandText = @"INSERT INTO Devices (ChannelId, Name, IPAddress, Port, SlaveId, Description) 
-            VALUES (@ch, @n, @ip, @port, @slave, @desc); SELECT last_insert_rowid();";
-            cmd.Parameters.AddWithValue("@ch", device.ChannelId);
-            cmd.Parameters.AddWithValue("@n", device.Name);
-            cmd.Parameters.AddWithValue("@ip", device.IPAddress ?? "");
-            cmd.Parameters.AddWithValue("@port", device.Port);
-            cmd.Parameters.AddWithValue("@slave", device.SlaveId);
-            cmd.Parameters.AddWithValue("@desc", device.Description ?? "");
-            var id = (long)cmd.ExecuteScalar();
-            return (int)id;
+            cmd.CommandText = "UPDATE Channels SET Name=@n, Protocol=@p, Description=@d WHERE ChannelId=@id";
+            cmd.Parameters.AddWithValue("@n", ch.Name);
+            cmd.Parameters.AddWithValue("@p", (int)ch.Protocol);
+            cmd.Parameters.AddWithValue("@d", ch.Description ?? string.Empty);
+            cmd.Parameters.AddWithValue("@id", ch.ChannelId);
+            cmd.ExecuteNonQuery();
         }
 
+        /// <summary>Kanalı siler.</summary>
+        public void DeleteChannel(int channelId)
+        {
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "DELETE FROM Channels WHERE ChannelId=@id";
+            cmd.Parameters.AddWithValue("@id", channelId);
+            cmd.ExecuteNonQuery();
+        }
+
+        // ── DEVICES ──────────────────────────────────────────────────────────
+
+        /// <summary>Yeni cihaz ekler.</summary>
+        public int AddDevice(Device device)
+        {
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"INSERT INTO Devices (ChannelId, Name, IPAddress, Port, SlaveId, Description)
+                VALUES (@ch, @n, @ip, @port, @slave, @desc); SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@ch", device.ChannelId);
+            cmd.Parameters.AddWithValue("@n", device.Name);
+            cmd.Parameters.AddWithValue("@ip", device.IPAddress ?? string.Empty);
+            cmd.Parameters.AddWithValue("@port", device.Port);
+            cmd.Parameters.AddWithValue("@slave", device.SlaveId);
+            cmd.Parameters.AddWithValue("@desc", device.Description ?? string.Empty);
+            return (int)((long?)cmd.ExecuteScalar() ?? 0);
+        }
+
+        /// <summary>Kanala ait cihazları döndürür.</summary>
         public List<Device> GetDevicesByChannelId(int channelId)
         {
             var list = new List<Device>();
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
             cmd.CommandText = "SELECT DeviceId, ChannelId, Name, IPAddress, Port, SlaveId, Description FROM Devices WHERE ChannelId = @ch";
@@ -132,40 +123,70 @@ namespace Core.Database
                     DeviceId = r.GetInt32(0),
                     ChannelId = r.GetInt32(1),
                     Name = r.GetString(2),
-                    IPAddress = r.IsDBNull(3) ? "" : r.GetString(3),
+                    IPAddress = r.IsDBNull(3) ? string.Empty : r.GetString(3),
                     Port = r.IsDBNull(4) ? 0 : r.GetInt32(4),
                     SlaveId = r.IsDBNull(5) ? (byte)0 : (byte)r.GetInt32(5),
-                    Description = r.IsDBNull(6) ? "" : r.GetString(6)
+                    Description = r.IsDBNull(6) ? string.Empty : r.GetString(6),
                 });
             }
+
             return list;
         }
-        #endregion
 
-        #region Tags
+        /// <summary>Cihazı günceller.</summary>
+        public void UpdateDevice(Device dev)
+        {
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"UPDATE Devices SET Name=@n, IPAddress=@ip, Port=@port, SlaveId=@slave, Description=@desc
+                WHERE DeviceId=@id";
+            cmd.Parameters.AddWithValue("@n", dev.Name);
+            cmd.Parameters.AddWithValue("@ip", dev.IPAddress ?? string.Empty);
+            cmd.Parameters.AddWithValue("@port", dev.Port);
+            cmd.Parameters.AddWithValue("@slave", dev.SlaveId);
+            cmd.Parameters.AddWithValue("@desc", dev.Description ?? string.Empty);
+            cmd.Parameters.AddWithValue("@id", dev.DeviceId);
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>Cihazı siler.</summary>
+        public void DeleteDevice(int deviceId)
+        {
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = "DELETE FROM Devices WHERE DeviceId=@id";
+            cmd.Parameters.AddWithValue("@id", deviceId);
+            cmd.ExecuteNonQuery();
+        }
+
+        // ── TAGS ─────────────────────────────────────────────────────────────
+
+        /// <summary>Yeni tag ekler.</summary>
         public int AddTag(Tag tag)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
             cmd.CommandText = @"INSERT INTO Tags (DeviceId, Name, Address, RegisterType, DataType, Description, LastValue, LastUpdated)
-            VALUES (@dev, @n, @addr, @reg, @dt, @desc, @lv, @lu); SELECT last_insert_rowid();";
+                VALUES (@dev, @n, @addr, @reg, @dt, @desc, @lv, @lu); SELECT last_insert_rowid();";
             cmd.Parameters.AddWithValue("@dev", tag.DeviceId);
             cmd.Parameters.AddWithValue("@n", tag.Name);
             cmd.Parameters.AddWithValue("@addr", tag.Address);
-            cmd.Parameters.AddWithValue("@reg", tag.RegisterType ?? "");
+            cmd.Parameters.AddWithValue("@reg", tag.RegisterType ?? string.Empty);
             cmd.Parameters.AddWithValue("@dt", (int)tag.DataType);
-            cmd.Parameters.AddWithValue("@desc", tag.Description ?? "");
+            cmd.Parameters.AddWithValue("@desc", tag.Description ?? string.Empty);
             cmd.Parameters.AddWithValue("@lv", ConvertTagValue(tag));
             cmd.Parameters.AddWithValue("@lu", tag.LastUpdated?.ToString("o") ?? (object)DBNull.Value);
-            var id = (long)cmd.ExecuteScalar();
-            return (int)id;
+            return (int)((long?)cmd.ExecuteScalar() ?? 0);
         }
 
+        /// <summary>Cihaza ait tag'leri döndürür.</summary>
         public List<Tag> GetTagsByDeviceId(int deviceId)
         {
             var list = new List<Tag>();
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
             cmd.CommandText = "SELECT TagId, DeviceId, Name, Address, RegisterType, DataType, Description, LastValue, LastUpdated FROM Tags WHERE DeviceId = @dev";
@@ -179,170 +200,56 @@ namespace Core.Database
                     DeviceId = r.GetInt32(1),
                     Name = r.GetString(2),
                     Address = r.IsDBNull(3) ? 0 : r.GetInt32(3),
-                    RegisterType = r.IsDBNull(4) ? "" : r.GetString(4),
+                    RegisterType = r.IsDBNull(4) ? string.Empty : r.GetString(4),
                     DataType = r.IsDBNull(5) ? TagDataType.Int16 : (TagDataType)r.GetInt32(5),
-                    Description = r.IsDBNull(6) ? "" : r.GetString(6),
+                    Description = r.IsDBNull(6) ? string.Empty : r.GetString(6),
                     Value = r.IsDBNull(7) ? double.NaN : r.GetDouble(7),
-                    LastUpdated = r.IsDBNull(8) ? (DateTime?)null : DateTime.Parse(r.GetString(8))
+                    LastUpdated = r.IsDBNull(8) ? (DateTime?)null : DateTime.Parse(r.GetString(8), System.Globalization.CultureInfo.InvariantCulture),
                 };
                 list.Add(t);
             }
+
             return list;
         }
 
+        /// <summary>Tag'in son değerini ve geçmişini günceller.</summary>
         public void UpdateTagValue(Tag tag, double rawValue)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
-
             object dbValue = TagValueParser.Convert(tag.DataType, rawValue);
-
             using var cmd = con.CreateCommand();
-
             cmd.CommandText = @"
-            UPDATE Tags SET LastValue = @v, LastUpdated = @lu WHERE TagId = @id;
-            INSERT INTO TagHistory (TagId, Value, Timestamp) VALUES (@id, @v, @lu);";
-
+                UPDATE Tags SET LastValue = @v, LastUpdated = @lu WHERE TagId = @id;
+                INSERT INTO TagHistory (TagId, Value, Timestamp) VALUES (@id, @v, @lu);";
             cmd.Parameters.AddWithValue("@v", dbValue);
-            cmd.Parameters.AddWithValue("@lu", DateTime.Now.ToString("o"));
+            cmd.Parameters.AddWithValue("@lu", DateTime.Now.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
             cmd.Parameters.AddWithValue("@id", tag.TagId);
-
             cmd.ExecuteNonQuery();
-
-            // 🔴 OPC UPDATE BURAYA
-            _tagUpdater?.UpdateTag(tag.Name, dbValue);
+            this.tagUpdater?.UpdateTag(tag.Name, dbValue);
         }
 
-        #endregion
-        /*public void InsertHistory(int tagId, double value, DateTime ts)
+        /// <summary>Tag'i günceller.</summary>
+        public void UpdateTag(Tag tag)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
-            con.Open();
-
-            using var cmd = con.CreateCommand();
-            cmd.CommandText =
-                "INSERT INTO TagHistory (TagId, Value, Timestamp) VALUES (@id, @v, @ts)";
-
-            cmd.Parameters.AddWithValue("@id", tagId);
-            cmd.Parameters.AddWithValue("@v", value);
-            cmd.Parameters.AddWithValue("@ts", ts.ToString("o"));
-
-            cmd.ExecuteNonQuery();
-        }*/
-
-        // 1. VERSİYON: Sadece son 100 veriyi getirir (Testler ve Canlı Grafik için)
-        public List<(DateTime Timestamp, double Value)> GetTagHistory(int tagId)
-        {
-            var list = new List<(DateTime, double)>();
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
-            con.Open();
-
-            using var cmd = con.CreateCommand();
-            // Son 100 kayıt
-            cmd.CommandText = "SELECT Timestamp, Value FROM TagHistory WHERE TagId=@id ORDER BY Id DESC LIMIT 100";
-            cmd.Parameters.AddWithValue("@id", tagId);
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                if (DateTime.TryParse(reader.GetString(0), out DateTime dt))
-                {
-                    list.Add((dt, reader.GetDouble(1)));
-                }
-            }
-            list.Reverse(); // Grafikte soldan sağa akması için
-            return list;
-        }
-
-        // 2. VERSİYON: Tarih aralığına göre getirir (Filtreleme Ekranı için)
-        public List<(DateTime Timestamp, double Value)> GetTagHistory(int tagId, DateTime startDate, DateTime endDate)
-        {
-            var list = new List<(DateTime, double)>();
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
-            con.Open();
-
-            using var cmd = con.CreateCommand();
-            // Belirli tarih aralığı
-            cmd.CommandText = @"
-        SELECT Timestamp, Value 
-        FROM TagHistory 
-        WHERE TagId=@id 
-          AND Timestamp >= @start 
-          AND Timestamp <= @end 
-        ORDER BY Timestamp ASC";
-
-            cmd.Parameters.AddWithValue("@id", tagId);
-            cmd.Parameters.AddWithValue("@start", startDate.ToString("o"));
-            cmd.Parameters.AddWithValue("@end", endDate.ToString("o"));
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                if (DateTime.TryParse(reader.GetString(0), out DateTime dt))
-                {
-                    list.Add((dt, reader.GetDouble(1)));
-                }
-            }
-            return list;
-        }
-
-
-        public void Dispose()
-        {
-            // nothing to dispose currently
-        }
-
-        private object ConvertTagValue(Tag tag)
-        {
-            if (tag.Value == null)
-                return DBNull.Value;
-
-            switch (tag.DataType)
-            {
-                case TagDataType.Float:
-                    if (double.TryParse(tag.Value.ToString(), out double f))
-                        return f;
-                    return DBNull.Value;
-
-                case TagDataType.Int16:
-                case TagDataType.UInt16:
-                    if (int.TryParse(tag.Value.ToString(), out int i))
-                        return i;
-                    return DBNull.Value;
-
-                case TagDataType.Bool:
-                    if (bool.TryParse(tag.Value.ToString(), out bool b))
-                        return b ? 1 : 0;
-                    return DBNull.Value;
-
-                default:
-                    return DBNull.Value;
-            }
-        }
-
-        public void DeleteChannel(int channelId)
-        {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
-            cmd.CommandText = "DELETE FROM Channels WHERE ChannelId=@id";
-            cmd.Parameters.AddWithValue("@id", channelId);
+            cmd.CommandText = @"UPDATE Tags SET Name=@n, Address=@addr, RegisterType=@reg, DataType=@dt, Description=@desc
+                WHERE TagId=@id";
+            cmd.Parameters.AddWithValue("@n", tag.Name);
+            cmd.Parameters.AddWithValue("@addr", tag.Address);
+            cmd.Parameters.AddWithValue("@reg", tag.RegisterType ?? string.Empty);
+            cmd.Parameters.AddWithValue("@dt", (int)tag.DataType);
+            cmd.Parameters.AddWithValue("@desc", tag.Description ?? string.Empty);
+            cmd.Parameters.AddWithValue("@id", tag.TagId);
             cmd.ExecuteNonQuery();
         }
 
-        public void DeleteDevice(int deviceId)
-        {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
-            con.Open();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = "DELETE FROM Devices WHERE DeviceId=@id";
-            cmd.Parameters.AddWithValue("@id", deviceId);
-            cmd.ExecuteNonQuery();
-        }
-
+        /// <summary>Tag'i siler.</summary>
         public void DeleteTag(int tagId)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
             cmd.CommandText = "DELETE FROM Tags WHERE TagId=@id";
@@ -350,54 +257,155 @@ namespace Core.Database
             cmd.ExecuteNonQuery();
         }
 
-        #region Update Methods
+        // ── HISTORY ──────────────────────────────────────────────────────────
 
-        public void UpdateChannel(Channel ch)
+        /// <summary>Son 100 geçmiş kaydını döndürür.</summary>
+        public List<(DateTime Timestamp, double Value)> GetTagHistory(int tagId)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
+            var list = new List<(DateTime, double)>();
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
             con.Open();
             using var cmd = con.CreateCommand();
-            cmd.CommandText = "UPDATE Channels SET Name=@n, Protocol=@p, Description=@d WHERE ChannelId=@id";
-            cmd.Parameters.AddWithValue("@n", ch.Name);
-            cmd.Parameters.AddWithValue("@p", (int)ch.Protocol);
-            cmd.Parameters.AddWithValue("@d", ch.Description ?? "");
-            cmd.Parameters.AddWithValue("@id", ch.ChannelId);
+            cmd.CommandText = "SELECT Timestamp, Value FROM TagHistory WHERE TagId=@id ORDER BY Id DESC LIMIT 100";
+            cmd.Parameters.AddWithValue("@id", tagId);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (DateTime.TryParse(reader.GetString(0), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime dt))
+                {
+                    list.Add((dt, reader.GetDouble(1)));
+                }
+            }
+
+            list.Reverse();
+            return list;
+        }
+
+        /// <summary>Tarih aralığına göre geçmiş döndürür.</summary>
+        public List<(DateTime Timestamp, double Value)> GetTagHistory(int tagId, DateTime startDate, DateTime endDate)
+        {
+            var list = new List<(DateTime, double)>();
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"SELECT Timestamp, Value FROM TagHistory
+                WHERE TagId=@id AND Timestamp >= @start AND Timestamp <= @end
+                ORDER BY Timestamp ASC";
+            cmd.Parameters.AddWithValue("@id", tagId);
+            cmd.Parameters.AddWithValue("@start", startDate.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@end", endDate.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (DateTime.TryParse(reader.GetString(0), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime dt))
+                {
+                    list.Add((dt, reader.GetDouble(1)));
+                }
+            }
+
+            return list;
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            this.Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>Kaynakları serbest bırakır.</summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (this.disposed)
+            {
+                return;
+            }
+
+            if (disposing) { }
+
+            this.disposed = true;
+        }
+
+        private void Initialize()
+        {
+            using var con = new SqliteConnection($"Data Source={this.dbPath}");
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+                CREATE TABLE IF NOT EXISTS Channels (
+                    ChannelId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL,
+                    Protocol INTEGER NOT NULL,
+                    Description TEXT
+                );
+                CREATE TABLE IF NOT EXISTS Devices (
+                    DeviceId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ChannelId INTEGER NOT NULL,
+                    Name TEXT NOT NULL,
+                    IPAddress TEXT,
+                    Port INTEGER,
+                    SlaveId INTEGER,
+                    Description TEXT,
+                    FOREIGN KEY(ChannelId) REFERENCES Channels(ChannelId) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS Tags (
+                    TagId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    DeviceId INTEGER NOT NULL,
+                    Name TEXT NOT NULL,
+                    Address INTEGER,
+                    RegisterType TEXT,
+                    DataType INTEGER,
+                    Description TEXT,
+                    LastValue REAL,
+                    LastUpdated TEXT,
+                    FOREIGN KEY(DeviceId) REFERENCES Devices(DeviceId) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS TagHistory (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    TagId INTEGER,
+                    Value REAL,
+                    Timestamp TEXT
+                );";
             cmd.ExecuteNonQuery();
         }
 
-        public void UpdateDevice(Device dev)
+        private static object ConvertTagValue(Tag tag)
         {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
-            con.Open();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = @"UPDATE Devices SET Name=@n, IPAddress=@ip, Port=@port, SlaveId=@slave, Description=@desc 
-                        WHERE DeviceId=@id";
-            cmd.Parameters.AddWithValue("@n", dev.Name);
-            cmd.Parameters.AddWithValue("@ip", dev.IPAddress);
-            cmd.Parameters.AddWithValue("@port", dev.Port);
-            cmd.Parameters.AddWithValue("@slave", dev.SlaveId);
-            cmd.Parameters.AddWithValue("@desc", dev.Description ?? "");
-            cmd.Parameters.AddWithValue("@id", dev.DeviceId);
-            cmd.ExecuteNonQuery();
-        }
+            if (tag.Value == null)
+            {
+                return DBNull.Value;
+            }
 
-        public void UpdateTag(Tag tag)
-        {
-            using var con = new SqliteConnection($"Data Source={_dbPath}");
-            con.Open();
-            using var cmd = con.CreateCommand();
-            cmd.CommandText = @"UPDATE Tags SET Name=@n, Address=@addr, RegisterType=@reg, DataType=@dt, Description=@desc 
-                        WHERE TagId=@id";
-            cmd.Parameters.AddWithValue("@n", tag.Name);
-            cmd.Parameters.AddWithValue("@addr", tag.Address);
-            cmd.Parameters.AddWithValue("@reg", tag.RegisterType);
-            cmd.Parameters.AddWithValue("@dt", (int)tag.DataType);
-            cmd.Parameters.AddWithValue("@desc", tag.Description ?? "");
-            cmd.Parameters.AddWithValue("@id", tag.TagId);
-            cmd.ExecuteNonQuery();
-        }
+            switch (tag.DataType)
+            {
+                case TagDataType.Float:
+                    if (double.TryParse(tag.Value.ToString(), out double f))
+                    {
+                        return f;
+                    }
 
-        #endregion
+                    return DBNull.Value;
+
+                case TagDataType.Int16:
+                case TagDataType.UInt16:
+                    if (int.TryParse(tag.Value.ToString(), out int i))
+                    {
+                        return i;
+                    }
+
+                    return DBNull.Value;
+
+                case TagDataType.Bool:
+                    if (bool.TryParse(tag.Value.ToString(), out bool b))
+                    {
+                        return b ? 1 : 0;
+                    }
+
+                    return DBNull.Value;
+
+                default:
+                    return DBNull.Value;
+            }
+        }
     }
-
 }
