@@ -34,7 +34,7 @@ jobs:
 
       # CI pipeline'dan bağımsız ikinci bir secret taraması
       - name: Gitleaks Final Check
-        uses: gitleaks/gitleaks-action@ff98106
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
