@@ -13,10 +13,10 @@ namespace Core.Protocols
         public int UnitIdentifier { get => _client.UnitIdentifier; set => _client.UnitIdentifier = (byte)value; }
         public void Connect() => _client.Connect();
         public void Disconnect() => _client.Disconnect();
-        public int[] ReadHoldingRegisters(int a, int q) => _client.ReadHoldingRegisters(a, q);
-        public int[] ReadInputRegisters(int a, int q) => _client.ReadInputRegisters(a, q);
-        public bool[] ReadCoils(int a, int q) => _client.ReadCoils(a, q);
-        public bool[] ReadDiscreteInputs(int a, int q) => _client.ReadDiscreteInputs(a, q);
+        public int[] ReadHoldingRegisters(int address, int quantity) => _client.ReadHoldingRegisters(address, quantity);
+        public int[] ReadInputRegisters(int address, int quantity) => _client.ReadInputRegisters(address, quantity);
+        public bool[] ReadCoils(int address, int quantity) => _client.ReadCoils(address, quantity);
+        public bool[] ReadDiscreteInputs(int address, int quantity) => _client.ReadDiscreteInputs(address, quantity);
         public void Dispose() => _client?.Disconnect();
     }
 }

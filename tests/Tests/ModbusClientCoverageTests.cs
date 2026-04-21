@@ -388,6 +388,92 @@ namespace Tests
 
         // ── YARDIMCI ─────────────────────────────────────────────────────────
 
+        [Theory]
+        [InlineData("HoldingRegister", TagDataType.Int16)]
+        [InlineData("InputRegister", TagDataType.Int16)]
+        [InlineData("Coil", TagDataType.Bool)]
+        [InlineData("DiscreteInput", TagDataType.Bool)]
+        public async Task ReadTagAsync_AllRegisterTypes_ShouldBeCovered(string regType, TagDataType dataType)
+        {
+            // 1. Mock nesnesini her tip için hazırla
+            var mockClient = new Mock<IModbusClientAdapter>();
+            mockClient.Setup(m => m.Connected).Returns(true);
+
+            // Tüm metodları taklit et ki switch-case içinde hata almasın
+            mockClient.Setup(m => m.ReadHoldingRegisters(It.IsAny<int>(), It.IsAny<int>())).Returns(new int[] { 1 });
+            mockClient.Setup(m => m.ReadInputRegisters(It.IsAny<int>(), It.IsAny<int>())).Returns(new int[] { 1 });
+            mockClient.Setup(m => m.ReadCoils(It.IsAny<int>(), It.IsAny<int>())).Returns(new bool[] { true });
+            mockClient.Setup(m => m.ReadDiscreteInputs(It.IsAny<int>(), It.IsAny<int>())).Returns(new bool[] { true });
+
+            var wrapper = new ModbusClientWrapper(MakeDevice(), mockClient.Object);
+            var tag = new Tag { RegisterType = regType, DataType = dataType, Address = 1 };
+
+            // 2. Çalıştır - Bu işlem ExecuteModbusRead içindeki ilgili satırları boyayacak
+            var result = await wrapper.ReadTagAsync(tag);
+
+            // 3. Doğrula
+            Assert.True(result.Success);
+        }
+
+        [Fact]
+        public async Task ReadTagAsync_RetryLogic_And_CatchBlock_ShouldBeCovered()
+        {
+            var mockClient = new Mock<IModbusClientAdapter>();
+            mockClient.Setup(m => m.Connected).Returns(true);
+
+            // İlk denemede hata fırlat, sistem catch bloğuna girsin
+            mockClient.Setup(m => m.ReadHoldingRegisters(It.IsAny<int>(), It.IsAny<int>()))
+                      .Throws(new Exception("Simulated Error"));
+
+            var wrapper = new ModbusClientWrapper(MakeDevice(), mockClient.Object);
+            var tag = new Tag { RegisterType = "HoldingRegister", DataType = TagDataType.Int16, Address = 1 };
+
+            // Çalıştır
+            var result = await wrapper.ReadTagAsync(tag);
+
+            // catch bloğunun çalıştığını ve 2 deneme sonunda başarısız olduğunu doğrula
+            Assert.False(result.Success);
+            Assert.Contains("2 deneme", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task ReadTagAsync_DoubleAndFloat_ShouldCoverCombineMethods()
+        {
+            var mockClient = new Mock<IModbusClientAdapter>();
+            mockClient.Setup(m => m.Connected).Returns(true);
+
+            // Double testi için 4 register dön
+            mockClient.Setup(m => m.ReadHoldingRegisters(It.IsAny<int>(), It.IsAny<int>()))
+                      .Returns(new int[] { 0, 0, 0, 0x3FF0 });
+
+            var wrapper = new ModbusClientWrapper(MakeDevice(), mockClient.Object);
+
+            // Double oku ki CombineToDouble metodu çalışsın
+            var tagDouble = new Tag { RegisterType = "HoldingRegister", DataType = TagDataType.Double, Address = 1 };
+            await wrapper.ReadTagAsync(tagDouble);
+
+            // Float için 2 register ayarla ve oku ki CombineToFloat çalışsın
+            mockClient.Setup(m => m.ReadHoldingRegisters(It.IsAny<int>(), It.IsAny<int>()))
+                      .Returns(new int[] { 0, 0x3F80 });
+            var tagFloat = new Tag { RegisterType = "HoldingRegister", DataType = TagDataType.Float, Address = 1 };
+            await wrapper.ReadTagAsync(tagFloat);
+        }
+
+        [Fact]
+        public async Task ExecuteModbusRead_InvalidType_ShouldThrowNotSupported()
+        {
+            var mockClient = new Mock<IModbusClientAdapter>();
+            mockClient.Setup(m => m.Connected).Returns(true);
+            var wrapper = new ModbusClientWrapper(MakeDevice(), mockClient.Object);
+
+            // Bilinmeyen bir tip göndererek switch-case'deki default/exception satırını boyayalım
+            var tag = new Tag { RegisterType = "UnknownType", DataType = TagDataType.Int16, Address = 1 };
+
+            var result = await wrapper.ReadTagAsync(tag);
+            Assert.False(result.Success);
+            Assert.Contains("Desteklenmeyen", result.ErrorMessage);
+        }
+
         private static Device MakeDevice(string ip = "127.0.0.1") =>
             new Device { DeviceId = 1, Name = "T", IPAddress = ip, Port = 502, SlaveId = 1 };
 

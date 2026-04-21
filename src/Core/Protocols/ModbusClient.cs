@@ -120,20 +120,26 @@ namespace Core.Protocols
             });
         }
 
-        /// <inheritdoc/>
+        private double ExecuteModbusRead(Tag tag)
+        {
+            int quantity = GetRegisterCount(tag.DataType);
+
+            return tag.RegisterType switch
+            {
+                "HoldingRegister" => ConvertRegisters(this.client.ReadHoldingRegisters(tag.Address, quantity), tag.DataType),
+                "InputRegister" => ConvertRegisters(this.client.ReadInputRegisters(tag.Address, quantity), tag.DataType),
+                "Coil" => this.client.ReadCoils(tag.Address, 1)[0] ? 1 : 0,
+                "DiscreteInput" => this.client.ReadDiscreteInputs(tag.Address, 1)[0] ? 1 : 0,
+                _ => throw new NotSupportedException($"Desteklenmeyen register tipi: {tag.RegisterType}")
+            };
+        }
         public async Task<ReadResult> ReadTagAsync(Tag tag, CancellationToken ct = default)
         {
-            if (tag == null)
-            {
-                return new ReadResult { Success = false, ErrorMessage = "Tag null" };
-            }
+            if (tag == null) return new ReadResult { Success = false, ErrorMessage = "Tag null" };
 
             if (tag.Address < 0 || tag.Address > 65535)
             {
-                this.logger?.LogWarning(
-                    "[MODBUS] Geçersiz adres: Tag={TagName} Address={Address}",
-                    tag.Name,
-                    tag.Address);
+                this.logger?.LogWarning("[MODBUS] Geçersiz adres: Tag={TagName} Address={Address}", tag.Name, tag.Address);
                 return new ReadResult { Success = false, ErrorMessage = "Geçersiz Modbus adresi" };
             }
 
@@ -144,80 +150,29 @@ namespace Core.Protocols
             {
                 try
                 {
-                    if (!this.IsConnected)
+                    if (!this.IsConnected) await this.ConnectAsync(ct);
+
+                    double value = await Task.Run(() => ExecuteModbusRead(tag), ct);
+
+                    this.DataReceived?.Invoke(this, new DataReceivedEventArgs
                     {
-                        await this.ConnectAsync(ct);
-                    }
-
-                    int quantity = GetRegisterCount(tag.DataType);
-                    double value = 0;
-
-                    await Task.Run(
-                        () =>
-                        {
-                            switch (tag.RegisterType)
-                            {
-                                case "HoldingRegister":
-                                    var hr = this.client.ReadHoldingRegisters(tag.Address, quantity);
-                                    value = ConvertRegisters(hr, tag.DataType);
-                                    break;
-
-                                case "InputRegister":
-                                    var ir = this.client.ReadInputRegisters(tag.Address, quantity);
-                                    value = ConvertRegisters(ir, tag.DataType);
-                                    break;
-
-                                case "Coil":
-                                    value = this.client.ReadCoils(tag.Address, 1)[0] ? 1 : 0;
-                                    break;
-
-                                case "DiscreteInput":
-                                    value = this.client.ReadDiscreteInputs(tag.Address, 1)[0] ? 1 : 0;
-                                    break;
-
-                                default:
-                                    throw new NotSupportedException(
-                                        $"Desteklenmeyen register tipi: {tag.RegisterType}");
-                            }
-                        },
-                        ct);
-
-                    this.DataReceived?.Invoke(
-                        this,
-                        new DataReceivedEventArgs
-                        {
-                            TagId = tag.TagId,
-                            Value = value,
-                            Timestamp = DateTime.Now,
-                        });
+                        TagId = tag.TagId,
+                        Value = value,
+                        Timestamp = DateTime.Now
+                    });
 
                     return new ReadResult { Success = true, Values = new[] { value } };
                 }
                 catch (Exception ex)
                 {
                     lastError = ex.Message;
-
-                    this.logger?.LogWarning(
-                        ex,
-                        "[MODBUS] Okuma hatası (deneme {Attempt}/{Max}): Tag={TagName}",
-                        i + 1,
-                        maxRetries,
-                        tag.Name);
-
+                    this.logger?.LogWarning(ex, "[MODBUS] Okuma hatası (deneme {Attempt}/{Max}): Tag={TagName}", i + 1, maxRetries, tag.Name);
                     await this.DisconnectAsync();
                 }
             }
 
-            this.logger?.LogError(
-                "[MODBUS] Tag okunamadı: Tag={TagName} | SonHata={Error}",
-                tag.Name,
-                lastError);
-
-            return new ReadResult
-            {
-                Success = false,
-                ErrorMessage = $"Okuma başarısız ({maxRetries} deneme): {lastError}",
-            };
+            this.logger?.LogError("[MODBUS] Tag okunamadı: Tag={TagName} | SonHata={Error}", tag.Name, lastError);
+            return new ReadResult { Success = false, ErrorMessage = $"Okuma başarısız ({maxRetries} deneme): {lastError}" };
         }
 
         /// <inheritdoc/>
