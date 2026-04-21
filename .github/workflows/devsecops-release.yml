@@ -62,6 +62,7 @@ jobs:
         run: |
           dotnet build OpcServerSolution.sln `
             --configuration Release `
+            --runtime win-x64 `
             --no-restore `
             -p:TreatWarningsAsErrors=false
         shell: powershell
