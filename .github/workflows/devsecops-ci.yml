@@ -183,7 +183,7 @@ jobs:
             /d:sonar.token="$env:SONAR_TOKEN" `
             /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" `
             /d:sonar.exclusions="**/UI/**,**/TestApp/**,**/OPC Server/**" `
-            /d:sonar.coverage.exclusions="**/UI/**,**/TestApp/**,**/Infrastructure/OPC/OpcServerService.cs,**/Infrastructure/OPC/CustomNodeManager.cs,**/Infrastructure/OPC/DevSecOpsServer.cs,**/Infrastructure/OPC/ModbusOpcBridge.cs" `
+            /d:sonar.coverage.exclusions=/d:sonar.coverage.exclusions="**/UI/**,**/TestApp/**,**/Infrastructure/OPC/OpcServerService.cs,**/Infrastructure/OPC/CustomNodeManager.cs,**/Infrastructure/OPC/DevSecOpsServer.cs,**/Infrastructure/OPC/ModbusOpcBridge.cs,**/Infrastructure/Protocols/EasyModbusAdapter.cs" `
             /d:sonar.qualitygate.wait=true
 
           # sonar.qualitygate.wait=true → Quality Gate sonucu bekler
