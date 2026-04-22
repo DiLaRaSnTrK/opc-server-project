@@ -1,9 +1,11 @@
-﻿using System.Net.Sockets;
-using Core.Interfaces;
-using NModbus;
+﻿// Copyright (c) OPC Server Project. All rights reserved.
 
 namespace Infrastructure.Protocols
 {
+    using System.Net.Sockets;
+    using Core.Interfaces;
+    using NModbus;
+
     public class NModbusAdapter : IModbusClientAdapter
     {
         private TcpClient _tcpClient;
