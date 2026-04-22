@@ -40,7 +40,7 @@ namespace Core.Protocols
            }*/
         public ModbusClientWrapper(Device device, ILogger<ModbusClientWrapper>? logger = null)
         {
-            this.device = device;
+            this.device = device ?? throw new ArgumentNullException(nameof(device));
             this.logger = logger;
             // Tek satır değişimle tüm sistem kütüphane değiştirdi!
             this.client = new NModbusAdapter(device.IPAddress, device.Port);
