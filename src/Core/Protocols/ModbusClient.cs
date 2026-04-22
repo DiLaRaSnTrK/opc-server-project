@@ -9,6 +9,7 @@ namespace Core.Protocols
     using System.Threading.Tasks;
     using Core.Interfaces;
     using Core.Models;
+    using Infrastructure.Protocols;
     using Microsoft.Extensions.Logging;
 
     /// <summary>
@@ -31,11 +32,18 @@ namespace Core.Protocols
         private bool disposed;
 
         /// <summary>Initializes a new instance of the <see cref="ModbusClientWrapper"/> class.</summary>
+        /*   public ModbusClientWrapper(Device device, ILogger<ModbusClientWrapper>? logger = null)
+           {
+               this.device = device ?? throw new ArgumentNullException(nameof(device));
+               this.logger = logger;
+               this.client = new EasyModbusAdapter(device.IPAddress, device.Port);
+           }*/
         public ModbusClientWrapper(Device device, ILogger<ModbusClientWrapper>? logger = null)
         {
             this.device = device ?? throw new ArgumentNullException(nameof(device));
             this.logger = logger;
-            this.client = new EasyModbusAdapter(device.IPAddress, device.Port);
+            // Tek satır değişimle tüm sistem kütüphane değiştirdi!
+            this.client = new NModbusAdapter(device.IPAddress, device.Port);
         }
         // Testler için kullanılacak özel constructor
         public ModbusClientWrapper(Device device, IModbusClientAdapter client, ILogger<ModbusClientWrapper>? logger = null)
