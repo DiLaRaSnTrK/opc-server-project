@@ -9,7 +9,6 @@ namespace Core.Protocols
     using System.Threading.Tasks;
     using Core.Interfaces;
     using Core.Models;
-    using Infrastructure.Protocols;
     using Microsoft.Extensions.Logging;
 
     /// <summary>

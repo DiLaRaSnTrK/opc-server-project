@@ -9,6 +9,7 @@ namespace UI
     using Core.Database;
     using Core.Models;
     using Core.Protocols;
+    using Core.Security;
     using Infrastructure.OPC;
     using Microsoft.Extensions.Logging;
     using Serilog;
@@ -97,6 +98,39 @@ namespace UI
             menuTag.Items.Add(deleteOnlyTag);
 
             treeView1.NodeMouseClick += TreeView1_NodeMouseClick;
+
+            // ── RBAC: Operator rolünde yönetim menüleri gizlenir ─────────
+            this.ApplyRolePermissions();
+        }
+
+        private void ApplyRolePermissions()
+        {
+            bool isAdmin = SessionContext.Instance.IsAdmin;
+
+            // Başlık çubuğuna kullanıcı ve rolü göster
+            this.Text = $"OPC Server [{SessionContext.Instance.Username} — {SessionContext.Instance.Role}]";
+
+            // Operator: tüm ekleme/silme menü öğeleri gizli
+            foreach (ToolStripItem item in menuChannel.Items)
+            {
+                item.Visible = isAdmin;
+            }
+
+            foreach (ToolStripItem item in menuDevice.Items)
+            {
+                item.Visible = isAdmin;
+            }
+
+            foreach (ToolStripItem item in menuTag.Items)
+            {
+                item.Visible = isAdmin;
+            }
+
+            // Connectivity menüsü (kanal ekleme) sadece admin
+            foreach (ToolStripItem item in menuConnectivity.Items)
+            {
+                item.Visible = isAdmin;
+            }
         }
 
         // ---------------- Sağ Tık -> Silme ----------------

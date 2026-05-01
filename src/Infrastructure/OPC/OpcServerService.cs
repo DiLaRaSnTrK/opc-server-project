@@ -83,8 +83,8 @@ namespace Infrastructure.OPC
                         StoreType = @"Directory",
                         StorePath = @"./pki/Rejected", // DEĞİŞTİ
                     },
-                    AutoAcceptUntrustedCertificates = true,
-                    RejectSHA1SignedCertificates = false, // Uyumluluk için false kalsın
+                    AutoAcceptUntrustedCertificates = false,
+                    RejectSHA1SignedCertificates = true, // Uyumluluk için false kalsın
                     MinimumCertificateKeySize = 2048,
                 },
                 TransportQuotas = new TransportQuotas
