@@ -83,8 +83,8 @@ namespace Infrastructure.OPC
                         StoreType = @"Directory",
                         StorePath = @"./pki/Rejected", // DEĞİŞTİ
                     },
-                    AutoAcceptUntrustedCertificates = false,
-                    RejectSHA1SignedCertificates = true, // Uyumluluk için false kalsın
+                    AutoAcceptUntrustedCertificates = false,    // T-01: Güvenilmeyen sertifikalar reddedilir
+                    RejectSHA1SignedCertificates = true,     // T-10: SHA-1 sertifikalar reddedilir (NIST)
                     MinimumCertificateKeySize = 2048,
                 },
                 TransportQuotas = new TransportQuotas
@@ -97,14 +97,9 @@ namespace Infrastructure.OPC
                 },
                 ServerConfiguration = new ServerConfiguration
                 {
-                    BaseAddresses = new StringCollection { "opc.tcp://0.0.0.0:4840" },
+                    BaseAddresses = new StringCollection { "opc.tcp://localhost:4840" },
                     SecurityPolicies = new ServerSecurityPolicyCollection
                     {
-                        /*new ServerSecurityPolicy 
-                        {
-                            SecurityMode = MessageSecurityMode.None, 
-                            SecurityPolicyUri = SecurityPolicies.None 
-                        },*/
                         new ServerSecurityPolicy
                         {
                             SecurityMode      = MessageSecurityMode.SignAndEncrypt,

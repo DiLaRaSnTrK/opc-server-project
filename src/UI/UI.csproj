@@ -6,7 +6,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="EasyModbusTCP" Version="5.6.0" />
 		<PackageReference Include="HIC.System.Windows.Forms.DataVisualization" Version="1.0.1" />
 		<PackageReference Include="LiveCharts.Core" Version="0.9.8" />
 		<PackageReference Include="LiveCharts.WinForms.NetCore3" Version="0.9.8" />

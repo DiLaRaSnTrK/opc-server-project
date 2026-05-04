@@ -29,6 +29,8 @@ namespace UI
 
         // ── SERILOG LOGGER (T-06) ─────────────────────────────────────────────
         private static readonly ILoggerFactory AppLoggerFactory = BuildLoggerFactory();
+        private static readonly Microsoft.Extensions.Logging.ILogger AppLogger =
+            AppLoggerFactory.CreateLogger("AuditLog");
 
         private static ILoggerFactory BuildLoggerFactory()
         {
@@ -133,9 +135,33 @@ namespace UI
             }
         }
 
+        // ── RBAC: Yetki kontrolü ─────────────────────────────────────────
+        // Her admin işleminin başında çağrılır.
+        // UI katmanı bypass edilse bile koruma sağlar.
+        private static bool RequireAdmin(string actionName = "Bu işlem")
+        {
+            if (SessionContext.Instance.IsAdmin)
+            {
+                // A09: Admin işlemi denetim logu
+                AppLogger.LogInformation(
+                    "[AUDIT] Admin işlemi: {Action} | Kullanıcı={User}",
+                    actionName, SessionContext.Instance.Username);
+                return true;
+            }
+
+            MessageBox.Show(
+                $"{actionName} yalnızca Admin yetkisiyle yapılabilir.\n\n" +
+                $"Mevcut rol: {SessionContext.Instance.Role}",
+                "Yetkisiz Erişim",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return false;
+        }
+
         // ---------------- Sağ Tık -> Silme ----------------
         private void OnDeleteChannelClick(object sender, EventArgs e)
         {
+            if (!RequireAdmin("Kanal silme")) return;
             if (treeView1.SelectedNode?.Tag is Channel ch)
             {
                 // 1. ONAY İSTE
@@ -162,6 +188,7 @@ namespace UI
 
         private void OnDeleteDeviceClick(object sender, EventArgs e)
         {
+            if (!RequireAdmin("Cihaz silme")) return;
             if (treeView1.SelectedNode?.Tag is Device dev)
             {
                 // 1. ONAY İSTE
@@ -195,6 +222,7 @@ namespace UI
 
         private void OnDeleteTagClick(object sender, EventArgs e)
         {
+            if (!RequireAdmin("Tag silme")) return;
             if (treeView1.SelectedNode?.Tag is Tag tag)
             {
                 // 1. ONAY İSTE
@@ -331,6 +359,7 @@ namespace UI
         // ---------------- Sağ Tık -> Ekleme ----------------
         private void OnAddChannelClick(object sender, EventArgs e)
         {
+            if (!RequireAdmin("Kanal ekleme")) return;
             var f = new AddChannelForm();
             if (f.ShowDialog() == DialogResult.OK)
             {
@@ -344,6 +373,7 @@ namespace UI
 
         private void OnAddDeviceClick(object sender, EventArgs e)
         {
+            if (!RequireAdmin("Cihaz ekleme")) return;
             if (treeView1.SelectedNode.Tag is Channel ch)
             {
                 var f = new AddDeviceForm();
@@ -361,6 +391,7 @@ namespace UI
 
         private void OnAddTagClick(object sender, EventArgs e)
         {
+            if (!RequireAdmin("Tag ekleme")) return;
             if (treeView1.SelectedNode.Tag is Device dev)
             {
                 var f = new AddTagForm();
@@ -666,7 +697,7 @@ namespace UI
                 if (f.ShowDialog() == DialogResult.OK)
                 {
                     // Form kapandı, nesne güncellendi. Şimdi DB'ye yazalım.
-                    db.UpdateChannel(f.ChannelData);
+                    if (RequireAdmin("Kanal güncelleme")) { db.UpdateChannel(f.ChannelData); }
 
                     // Ağacı yenile (İsim değişmiş olabilir)
                     LoadTreeView();
@@ -686,7 +717,7 @@ namespace UI
                         _deviceConnections.Remove(dev.DeviceId);
                     }
 
-                    db.UpdateDevice(f.DeviceData);
+                    if (RequireAdmin("Cihaz güncelleme")) { db.UpdateDevice(f.DeviceData); }
                     LoadTreeView();
                     MessageBox.Show("Cihaz güncellendi.");
                 }
@@ -697,7 +728,7 @@ namespace UI
                 var f = new AddTagForm(tag);
                 if (f.ShowDialog() == DialogResult.OK)
                 {
-                    db.UpdateTag(f.TagData);
+                    if (RequireAdmin("Tag güncelleme")) { db.UpdateTag(f.TagData); }
                     LoadTreeView();
                     MessageBox.Show("Tag güncellendi.");
                 }

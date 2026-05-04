@@ -6,18 +6,23 @@ namespace UI
 {
     using System;
     using System.Drawing;
+    using System.Threading.Tasks;
     using System.Windows.Forms;
     using Core.Security;
+    using Serilog;
 
     /// <summary>
     /// Kullanıcı giriş formu.
-    /// Admin ve Operator rollerini destekler.
+    /// A04: Insecure Design  — başarısız denemeler arası artan gecikme (exponential backoff)
+    /// A07: Auth Failures    — MaxAttempts=5, sonrasında uygulama kapanır
+    /// A09: Logging          — tüm giriş olayları Serilog ile loglanır
     /// </summary>
     public class LoginForm : Form
     {
         private readonly UserService userService = new UserService();
         private int failedAttempts;
         private const int MaxAttempts = 2;
+        private bool isProcessing;
 
         private TextBox txtUsername;
         private TextBox txtPassword;
@@ -44,7 +49,6 @@ namespace UI
             this.StartPosition = FormStartPosition.CenterScreen;
             this.BackColor = Color.FromArgb(245, 247, 250);
 
-            // Başlık
             this.lblTitle = new Label
             {
                 Text = "DevSecOps OPC Server",
@@ -55,7 +59,6 @@ namespace UI
                 TextAlign = ContentAlignment.MiddleCenter,
             };
 
-            // Kullanıcı adı
             this.lblUsername = new Label
             {
                 Text = "Kullanıcı Adı",
@@ -71,7 +74,6 @@ namespace UI
                 BorderStyle = BorderStyle.FixedSingle,
             };
 
-            // Şifre
             this.lblPassword = new Label
             {
                 Text = "Şifre",
@@ -88,7 +90,6 @@ namespace UI
                 BorderStyle = BorderStyle.FixedSingle,
             };
 
-            // Hata mesajı
             this.lblError = new Label
             {
                 Text = string.Empty,
@@ -99,7 +100,6 @@ namespace UI
                 TextAlign = ContentAlignment.MiddleCenter,
             };
 
-            // Giriş butonu
             this.btnLogin = new Button
             {
                 Text = "Giriş Yap",
@@ -114,7 +114,6 @@ namespace UI
             this.btnLogin.FlatAppearance.BorderSize = 0;
             this.btnLogin.Click += this.BtnLogin_Click;
 
-            // İpucu
             this.lblHint = new Label
             {
                 Text = "admin / operator",
@@ -125,7 +124,6 @@ namespace UI
                 TextAlign = ContentAlignment.MiddleCenter,
             };
 
-            // Enter tuşu = giriş
             this.txtPassword.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -144,12 +142,17 @@ namespace UI
             this.AcceptButton = this.btnLogin;
         }
 
-        private void BtnLogin_Click(object sender, EventArgs e)
+        private async void BtnLogin_Click(object sender, EventArgs e)
         {
+            // Çift tıklamayı önle
+            if (this.isProcessing) return;
+
             this.lblError.Text = string.Empty;
 
+            // A07: MaxAttempts kontrolü
             if (this.failedAttempts >= MaxAttempts)
             {
+                Log.Warning("[AUTH] Maksimum başarısız deneme aşıldı. Uygulama kapatılıyor.");
                 MessageBox.Show(
                     "Çok fazla başarısız deneme. Uygulama kapanıyor.",
                     "Güvenlik Kilidi",
@@ -164,13 +167,42 @@ namespace UI
 
             if (this.userService.TryLogin(username, password))
             {
+                // A09: Başarılı giriş logla
+                Log.Information(
+                    "[AUTH] Başarılı giriş: Kullanıcı={Username} Rol={Role}",
+                    username,
+                    SessionContext.Instance.Role);
+
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             else
             {
                 this.failedAttempts++;
+
+                // A09: Başarısız giriş logla (şifre asla loglara yazılmaz)
+                Log.Warning(
+                    "[AUTH] Başarısız giriş denemesi: Kullanıcı={Username} Deneme={Attempt}/{Max}",
+                    username,
+                    this.failedAttempts,
+                    MaxAttempts);
+
+                // A04: Exponential backoff — her denemede artan gecikme
+                // 1. deneme: 500ms, 2: 1000ms, 3: 2000ms, 4: 4000ms
+                int delayMs = (int)Math.Pow(2, this.failedAttempts - 1) * 500;
+                delayMs = Math.Min(delayMs, 8000); // max 8 saniye
+
+                this.isProcessing = true;
+                this.btnLogin.Enabled = false;
                 int kalan = MaxAttempts - this.failedAttempts;
+                this.lblError.Text = kalan > 0
+                    ? $"Hatalı giriş. {delayMs / 1000.0:0.#}s bekleniyor... ({kalan} hak kaldı)"
+                    : "Son deneme!";
+
+                await Task.Delay(delayMs);
+
+                this.btnLogin.Enabled = true;
+                this.isProcessing = false;
                 this.lblError.Text = kalan > 0
                     ? $"Hatalı kullanıcı adı veya şifre. ({kalan} hak kaldı)"
                     : "Son deneme! Sonraki hata uygulamayı kapatır.";

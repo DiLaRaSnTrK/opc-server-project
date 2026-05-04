@@ -5,24 +5,35 @@
 namespace Core.Security
 {
     using System.Collections.Generic;
+    using BC = BCrypt.Net.BCrypt;
 
     /// <summary>
     /// Kullanıcı kimlik doğrulama servisi.
-    /// Gerçek projede şifreler hash'lenerek DB'de saklanır.
-    /// Bu implementasyonda sabit kullanıcılar tanımlıdır (demo amaçlı).
+    /// Şifreler BCrypt ile hash'lenerek saklanır — plaintext asla tutulmaz.
+    /// A02: Cryptographic Failures — BCrypt work factor 12 (OWASP önerisi).
     /// </summary>
     public class UserService
     {
-        // Demo kullanıcılar — üretimde DB'den okunmalı, şifreler bcrypt ile hash'lenmeli
-        private static readonly Dictionary<string, (string Password, UserRole Role)> Users =
+        // BCrypt hash'leri — üretimde DB'den okunur.
+        // Hash üretmek için: BCrypt.HashPassword("şifre", workFactor: 12)
+        // admin123   → aşağıdaki hash
+        // operator123 → aşağıdaki hash
+        private static readonly Dictionary<string, (string PasswordHash, UserRole Role)> Users =
             new Dictionary<string, (string, UserRole)>
             {
-                { "admin",    ("admin123",    UserRole.Admin) },
-                { "operator", ("operator123", UserRole.Operator) },
+                {
+                    "admin",
+                    (BC.HashPassword("admin123", workFactor: 12), UserRole.Admin)
+                },
+                {
+                    "operator",
+                    (BC.HashPassword("operator123", workFactor: 12), UserRole.Operator)
+                },
             };
 
         /// <summary>
         /// Kullanıcı adı ve şifreyi doğrular.
+        /// BCrypt.Verify ile hash karşılaştırması — timing attack'a karşı güvenli.
         /// Başarılıysa SessionContext'i günceller ve true döner.
         /// </summary>
         public bool TryLogin(string username, string password)
@@ -34,11 +45,15 @@ namespace Core.Security
             }
 
             var key = username.Trim().ToLowerInvariant();
-            if (Users.TryGetValue(key, out var creds) &&
-                creds.Password == password)
+
+            if (Users.TryGetValue(key, out var creds))
             {
-                SessionContext.Instance.Login(username.Trim(), creds.Role);
-                return true;
+                // A02: Timing-safe karşılaştırma — == operatörü yerine BCrypt.Verify
+                if (BC.Verify(password, creds.PasswordHash))
+                {
+                    SessionContext.Instance.Login(username.Trim(), creds.Role);
+                    return true;
+                }
             }
 
             return false;

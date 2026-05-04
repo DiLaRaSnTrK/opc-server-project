@@ -30,13 +30,6 @@ namespace Core.Protocols
         private readonly ILogger<ModbusClientWrapper>? logger;
         private bool disposed;
 
-        /// <summary>Initializes a new instance of the <see cref="ModbusClientWrapper"/> class.</summary>
-        /*   public ModbusClientWrapper(Device device, ILogger<ModbusClientWrapper>? logger = null)
-           {
-               this.device = device ?? throw new ArgumentNullException(nameof(device));
-               this.logger = logger;
-               this.client = new EasyModbusAdapter(device.IPAddress, device.Port);
-           }*/
         public ModbusClientWrapper(Device device, ILogger<ModbusClientWrapper>? logger = null)
         {
             this.device = device ?? throw new ArgumentNullException(nameof(device));
