@@ -1,20 +1,26 @@
-namespace UI;
+﻿namespace UI;
 
 static class Program
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
     [STAThread]
     static void Main()
     {
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
         ApplicationConfiguration.Initialize();
 
+        // Splash ekranı
         using (var splash = new SplashForm())
         {
             splash.ShowDialog();
+        }
+
+        // ── RBAC: Login formu ──────────────────────────────────────────────
+        // Kullanıcı giriş yapmazsa (ESC veya X ile kapatırsa) uygulama başlamaz
+        using (var login = new LoginForm())
+        {
+            if (login.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            {
+                return; // Giriş yapılmadı — uygulamayı başlatma
+            }
         }
 
         Application.Run(new Main());

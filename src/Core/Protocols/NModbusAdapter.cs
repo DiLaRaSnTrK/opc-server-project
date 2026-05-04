@@ -1,6 +1,6 @@
 ﻿// Copyright (c) OPC Server Project. All rights reserved.
 
-namespace Infrastructure.Protocols
+namespace Core.Protocols
 {
     using System.Net.Sockets;
     using Core.Interfaces;
