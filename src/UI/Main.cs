@@ -112,6 +112,9 @@ namespace UI
             // Başlık çubuğuna kullanıcı ve rolü göster
             this.Text = $"OPC Server [{SessionContext.Instance.Username} — {SessionContext.Instance.Role}]";
 
+            // Status bar başlangıç mesajı
+            SetStatus($"Giriş yapıldı: {SessionContext.Instance.Username} ({SessionContext.Instance.Role})");
+
             // Operator: tüm ekleme/silme menü öğeleri gizli
             foreach (ToolStripItem item in menuChannel.Items)
             {
@@ -610,13 +613,95 @@ namespace UI
             {
                 timer1.Start();
                 chkAutoRead.Text = "Otomatik Okuma: AKTİF";
-                chkAutoRead.BackColor = Color.LightGreen; // Görsel geri bildirim
+                chkAutoRead.BackColor = Color.LightGreen;
+                SetStatus("Otomatik okuma aktif — her 1 saniyede güncelleniyor.");
             }
             else
             {
                 timer1.Stop();
                 chkAutoRead.Text = "Otomatik Okuma Başlat";
                 chkAutoRead.BackColor = Color.Transparent;
+                SetStatus("Otomatik okuma durduruldu.");
+            }
+        }
+
+        // ── Durum çubuğu güncelleme yardımcısı ──────────────────────────────────
+        private void SetStatus(string message)
+        {
+            if (lblStatusText.InvokeRequired)
+                lblStatusText.Invoke(() => lblStatusText.Text = $"●  {message}");
+            else
+                lblStatusText.Text = $"●  {message}";
+        }
+
+        // ── Çıkış butonu ─────────────────────────────────────────────────
+        private void btnLogout_Click(object sender, EventArgs e)
+        {
+            // 1. Kullanıcı onayı
+            if (MessageBox.Show(
+                    "Çıkış yapmak istediğinizden emin misiniz?",
+                    "Güvenli Çıkış",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                // 2. Arka plan işlemlerini durdur
+                timer1.Stop();
+                _isScanning = false;
+                chkAutoRead.Checked = false;
+                chkAutoRead.Text = "Otomatik Okuma Başlat";
+                chkAutoRead.BackColor = Color.Transparent;
+
+                // 3. Formu gizle — ekranda hassas veri kalmasın
+                this.Hide();
+                dataGridView1.Rows.Clear();
+                dataGridView1.Columns.Clear();
+                treeView1.Nodes.Clear();
+
+                // 4. OPC sunucusunu ve Modbus bağlantılarını kapat
+                _opcServer?.StopAsync().GetAwaiter().GetResult();
+                if (_deviceConnections != null)
+                {
+                    foreach (var client in _deviceConnections.Values)
+                        try { client.Dispose(); } catch { }
+                    _deviceConnections.Clear();
+                }
+
+                // 5. Oturumu sonlandır
+                SessionContext.Instance.Logout();
+                Log.Information("[AUTH] Kullanıcı güvenli çıkış yaptı. Session temizlendi.");
+
+                // 6. Login ekranını göster
+                using var login = new LoginForm();
+                if (login.ShowDialog() == DialogResult.OK)
+                {
+                    // Yeniden giriş başarılı — OPC'yi yeniden başlat, UI'ı kur
+                    _ = _opcServer.StartAsync();
+                    this.ApplyRolePermissions();
+                    this.LoadChannelsFromDb();
+                    this.LoadTreeView();
+                    SetStatus($"Yeni oturum açıldı: {SessionContext.Instance.Username}");
+                    this.Show();
+                }
+                else
+                {
+                    // Giriş iptal — temiz kapat
+                    Log.Information("[AUTH] Login iptal edildi. Uygulama kapatılıyor.");
+                    this.Dispose();
+                    Application.Exit();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[ERROR] Logout sırasında beklenmeyen hata.");
+                MessageBox.Show(
+                    "Çıkış yapılırken bir hata oluştu:\n" + ex.Message,
+                    "Hata",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                Application.Exit();
             }
         }
 

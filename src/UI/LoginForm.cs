@@ -42,7 +42,7 @@ namespace UI
         private void InitializeUI()
         {
             this.Text = "OPC Server — Giriş";
-            this.Size = new Size(380, 320);
+            this.Size = new Size(400, 340);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -116,7 +116,7 @@ namespace UI
 
             this.lblHint = new Label
             {
-                Text = "admin / operator",
+                //Text = "admin / operator",
                 ForeColor = Color.Gray,
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Italic),
                 Location = new Point(40, 265),
