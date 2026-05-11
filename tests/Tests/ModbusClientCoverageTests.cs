@@ -439,24 +439,36 @@ namespace Tests
         [Fact]
         public async Task ReadTagAsync_DoubleAndFloat_ShouldCoverCombineMethods()
         {
+            var _nullLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger<ModbusClientWrapper>.Instance;
             var mockClient = new Mock<IModbusClientAdapter>();
             mockClient.Setup(m => m.Connected).Returns(true);
 
-            // Double testi için 4 register dön
+            // --- 1. Double Testi ---
+            // IEEE 754 formatında 1.0 (double) için 64-bit: 0x3FF0000000000000
+            // Register dizisi (Little-Endian/Big-Endian sırasına göre wrapper mantığınıza uymalıdır)
             mockClient.Setup(m => m.ReadHoldingRegisters(It.IsAny<int>(), It.IsAny<int>()))
                       .Returns(new int[] { 0, 0, 0, 0x3FF0 });
 
-            var wrapper = new ModbusClientWrapper(MakeDevice(), mockClient.Object);
+            var wrapper = new ModbusClientWrapper(MakeDevice(), mockClient.Object, _nullLogger);
 
-            // Double oku ki CombineToDouble metodu çalışsın
             var tagDouble = new Tag { RegisterType = "HoldingRegister", DataType = TagDataType.Double, Address = 1 };
-            await wrapper.ReadTagAsync(tagDouble);
+            var resultDouble = await wrapper.ReadTagAsync(tagDouble);
 
-            // Float için 2 register ayarla ve oku ki CombineToFloat çalışsın
+            // Assertion: Başarı durumu ve dönen değerin 1.0 (veya register karşılığı) olduğunu doğrula
+            Assert.True(resultDouble.Success);
+            Assert.Equal(1.0, resultDouble.Values[0]);
+
+            // --- 2. Float Testi ---
+            // IEEE 754 formatında 1.0 (float) için 32-bit: 0x3F800000
             mockClient.Setup(m => m.ReadHoldingRegisters(It.IsAny<int>(), It.IsAny<int>()))
                       .Returns(new int[] { 0, 0x3F80 });
+
             var tagFloat = new Tag { RegisterType = "HoldingRegister", DataType = TagDataType.Float, Address = 1 };
-            await wrapper.ReadTagAsync(tagFloat);
+            var resultFloat = await wrapper.ReadTagAsync(tagFloat);
+
+            // Assertion: Başarı durumu ve dönen değerin 1.0f olduğunu doğrula
+            Assert.True(resultFloat.Success);
+            Assert.Equal(1.0f, (float)resultFloat.Values[0]);
         }
 
         [Fact]
